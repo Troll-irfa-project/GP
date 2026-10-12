@@ -60,6 +60,9 @@ test('WebSocket: each human and bot keeps its own pilot and chair', { timeout: 1
     const joinedB = await b.wait(m => m.type === 'joined');
     const first = await a.wait(m => m.type === 'state' && m.racers.some(r => r.id === joinedB.playerId));
     assert.equal(first.racers.length, 6);
+    assert.equal(first.tracks, undefined, 'detailed static routes are not retransmitted every tick');
+    assert.equal(first.lobby.track, undefined);
+    assert.ok(Buffer.byteLength(JSON.stringify(first)) < 9000, 'six-player snapshot stays compact');
     assert.equal(first.racers.find(r => r.id === joinedA.playerId).pilotId, 'maya');
     assert.equal(first.racers.find(r => r.id === joinedB.playerId).pilotId, 'camille');
     assert.ok(first.racers.filter(r => r.isBot).every(r => pilots.some(p => p.id === r.pilotId)));

@@ -81,6 +81,8 @@ export function createSelection(onChange) {
     $('#trackDifficulty').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < theme.difficulty ? 'on' : ''}"></i>`).join('');
     $('#trackDifficulty').setAttribute('aria-label', `${theme.difficulty} sur 5`);
     const route = track.route.map(p => p.join(',')).join(' '), start = track.route[0];
+    const xs = track.route.map(p => p[0]), zs = track.route.map(p => p[1]);
+    $('#trackRoute').setAttribute('viewBox', `${Math.min(...xs) - 12} ${Math.min(...zs) - 12} ${Math.max(...xs) - Math.min(...xs) + 24} ${Math.max(...zs) - Math.min(...zs) + 24}`);
     $('#trackRoute').innerHTML = `<polyline points="${route} ${start.join(',')}" fill="none" stroke="#05172f" stroke-width="11" stroke-linejoin="round"/><polyline points="${route} ${start.join(',')}" fill="none" stroke="#f9dc50" stroke-width="5" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="5" fill="white" stroke="#0c2544" stroke-width="2"/>`;
     garage?.update(chair, pilot); garage?.setActive(visible && !isTrack);
     $('#continueButton').disabled = !ready; $('#startButton').disabled = !ready;

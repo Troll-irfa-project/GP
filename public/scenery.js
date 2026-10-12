@@ -1,11 +1,13 @@
-import { distanceToRoute } from './motion.js';
+import { distanceToRoute, angleDelta } from './motion.js';
+import { createCourse, pointAt } from './racing.js';
 import { groundHeight } from './environment-math.js';
 import { instanceModel } from './model-assets.js';
+import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
 
 export const raceThemes = {
-  coast: { sky: '#148ddf', fog: '#9fd9ef', ground: '#53a64b', water: '#129ebe', stone: '#dbc8a3', trees: '#50a569' },
+  coast: { sky: '#0c8bd8', fog: '#ade4ec', ground: '#398e48', water: '#079cb8', stone: '#e6cda0', trees: '#50a569' },
   neon: { sky: '#313e73', fog: '#68729b', ground: '#374965', water: '#334c7b', stone: '#30405d', trees: '#3c858b' },
-  garden: { sky: '#3aa9e8', fog: '#b6e8ee', ground: '#479845', water: '#249d9a', stone: '#bdaf81', trees: '#3c944c' },
+  garden: { sky: '#249de1', fog: '#b6e8ee', ground: '#288541', water: '#249d9a', stone: '#bdaf81', trees: '#3c944c' },
   metro: { sky: '#565581', fog: '#777f9b', ground: '#727c91', water: '#4b657e', stone: '#7c8497', trees: '#54898b' },
   orbit: { sky: '#a1b4ed', fog: '#d0d8f9', ground: '#acc4d9', water: '#b3c9f5', stone: '#e2e2ef', trees: '#829ee1' },
 };
@@ -23,13 +25,14 @@ export function sceneryPlacements(track) {
 
 // Geometry is batched by material; GLB props preserve their original hierarchy.
 export function decorateTrack(THREE, root, track, models = new Map()) {
-  const theme = raceThemes[track.id], batches = new Map(), transform = new THREE.Object3D();
+  const theme = raceThemes[track.id], course = createCourse(track), batches = new Map(), transform = new THREE.Object3D();
   root.userData.timeUniforms = []; root.userData.animated = [];
   const shapes = {
     box: new THREE.BoxGeometry(1, 1, 1), sphere: new THREE.SphereGeometry(1, 16, 12),
     rock: new THREE.IcosahedronGeometry(1, 1), roof: new THREE.ConeGeometry(1, 1, 16),
-    cliff: new THREE.CylinderGeometry(.78, 1, 1, 9, 3),
+    cliff: new THREE.IcosahedronGeometry(1, 1),
     cylinder: new THREE.CylinderGeometry(1, 1, 1, 24),
+    dome: new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2),
   };
   const isNight = track.id === 'neon' || track.id === 'metro';
   function place(shape, color, position, scale, rotation = 0, emissive = false) {
@@ -47,7 +50,8 @@ export function decorateTrack(THREE, root, track, models = new Map()) {
     ctx.strokeStyle = color; ctx.lineWidth = 12; ctx.strokeRect(6, 6, 500, 116);
     ctx.font = 'italic 900 64px Arial'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillStyle = color; ctx.fillText(text, 256, 67, 470);
     const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
-    const board = mesh(new THREE.PlaneGeometry(width, height), '#ffffff', [x, y, z], { map: texture, emissive: '#ffffff', emissiveMap: texture, emissiveIntensity: .22, side: THREE.DoubleSide }); board.rotation.y = yaw; return board;
+    const front = new THREE.PlaneGeometry(width, height), back = front.clone().rotateY(Math.PI), geometry = mergeGeometries([front, back]); front.dispose(); back.dispose();
+    const board = mesh(geometry, '#ffffff', [x, y, z], { map: texture, emissive: '#ffffff', emissiveMap: texture, emissiveIntensity: .22 }); board.rotation.y = yaw; return board;
   }
   // Stylized water: animated ripples and shoreline foam in one draw call.
   const time = { value: 0 }; root.userData.timeUniforms.push(time);
@@ -67,18 +71,27 @@ export function decorateTrack(THREE, root, track, models = new Map()) {
   const sea = new THREE.Mesh(seaGeometry, waterMaterial); sea.name = 'animated-water'; sea.position.y = -3.4; root.add(sea);
   // Large cliff stacks and distant islands frame the course instead of a flat disk.
   for (let i = 0; i < 26; i++) {
-    const angle = i * Math.PI * 2 / 26, r = 132 + i % 4 * 8, h = 8 + (i * 7) % 25;
+    const angle = i * Math.PI * 2 / 26, r = 145 + i % 4 * 8, h = 12 + (i * 7) % 31;
     const x = Math.cos(angle) * r, z = Math.sin(angle) * r;
-    place('cliff', theme.stone, [x, h * .5 - 4, z], [11 + i % 4, h, 9 + i % 5], angle);
-    place('sphere', theme.ground, [x, h - 3.7, z], [8.3 + i % 4 * .6, .85, 6.7 + i % 5 * .5]);
+    place('cliff', theme.stone, [x, h * .35 - 4, z], [17 + i % 4 * 2, h * .65, 15 + i % 5], angle);
+    place('cliff', theme.ground, [x - 1.5, h * .68 - 4, z], [11 + i % 4, h * .32, 10 + i % 5], angle);
   }
   // Real houses form clusters; all foundations are outside the route envelope.
   const homes = sceneryPlacements(track);
   const homeIds = ['building-type-a', 'building-type-e', 'building-type-f'];
-  if (track.id !== 'neon' && track.id !== 'metro') for (let i = 0; i < homeIds.length; i++) {
+  if (track.id === 'coast' || track.id === 'garden') for (let i = 0; i < homeIds.length; i++) {
     const items = homes.filter((p, n) => n % 3 === i).map(p => ({ ...p, y: groundHeight(track, p.x, p.z), scale: 4.7 }));
     instanceModel(THREE, root, models.get(homeIds[i]), items);
     for (const p of items) place('box', theme.stone, [p.x, p.y - .10, p.z], [7, .5, 6.6], p.angle);
+  }
+  if (track.id === 'orbit') for (const p of homes) {
+    const y = groundHeight(track, p.x, p.z);
+    place('cylinder', '#617caa', [p.x, y + .25, p.z], [4.5, .5, 4.5]);
+    place('cylinder', '#e7edf7', [p.x, y + 1.4, p.z], [3.9, 2.4, 3.9]);
+    place('cylinder', '#89e1f2', [p.x, y + 2.4, p.z], [3.95, .18, 3.95], 0, true);
+    place('dome', '#95afdf', [p.x, y + 2.7, p.z], [3.6, 2.8, 3.6]);
+    place('cylinder', '#e7edf7', [p.x, y + 5.8, p.z], [.09, 1.4, .09]);
+    place('sphere', '#ffe3a0', [p.x, y + 6.6, p.z], [.25, .25, .25], 0, true);
   }
   // Layered skylines with luminous window bands for the two urban circuits.
   if (isNight) {
@@ -145,16 +158,18 @@ export function decorateTrack(THREE, root, track, models = new Map()) {
     place('box', '#183958', [x, 3.5, z], [.8, 7, .8]); place('box', '#ffda45', [x, 3.5, z], [.86, .25, .86]);
   }
   const arch = mesh(new THREE.BoxGeometry(19.8, 1.3, .65), '#142e52', [start[0], 7.2, start[1]]); arch.rotation.y = Math.PI / 2 - direction;
-  const board = sign('ROLL RUSH', start[0] - Math.cos(direction) * .34, 7.2, start[1] - Math.sin(direction) * .34, -Math.PI / 2 - direction, 12, 1.15); board.name = 'start-banner';
+  const board = sign('DÉPART / ARRIVÉE', start[0] - Math.cos(direction) * .34, 7.2, start[1] - Math.sin(direction) * .34, -Math.PI / 2 - direction, 12, 1.15); board.name = 'start-banner';
   // Roadside chevrons at corners, only when the entire panel is outside the road.
-  for (let i = 1; i < track.route.length; i += 2) {
-    const p = track.route[i], next = track.route[(i + 1) % track.route.length], dx = next[0] - p[0], dz = next[1] - p[1], len = Math.hypot(dx, dz);
-    for (const side of [-1, 1]) {
-      const x = p[0] - dz / len * 11.8 * side, z = p[1] + dx / len * 11.8 * side;
+  for (let along = 20; along < course.total; along += 18) {
+    const p = pointAt(course, along), next = pointAt(course, along + 12);
+    const heading = Math.atan2(p.tz, p.tx), turn = angleDelta(heading, Math.atan2(next.tz, next.tx));
+    if (Math.abs(turn) < .3) continue;
+    for (const side of [-Math.sign(turn)]) {
+      const x = p.x - p.tz * 11.8 * side, z = p.z + p.tx * 11.8 * side;
       if (distanceToRoute(x, z, track.route) < 10.8) continue;
       const y = groundHeight(track, x, z);
       place('cylinder', '#d1d9df', [x, y + 1.4, z], [.07, 2.8, .07]);
-      sign('› › ›', x, y + 2.8, z, -Math.PI / 2 - Math.atan2(dz, dx), 3.4, 1.25);
+      sign(turn > 0 ? '› › ›' : '‹ ‹ ‹', x, y + 2.8, z, -Math.PI / 2 - heading, 3.4, 1.25);
       break;
     }
   }
@@ -168,10 +183,10 @@ export function decorateTrack(THREE, root, track, models = new Map()) {
     }
   }
   if (track.id === 'orbit' || track.id === 'garden') {
-    for (const index of [2, 7, 12]) {
-      const p = track.route[index], next = track.route[(index + 1) % track.route.length];
-      const hoop = mesh(new THREE.TorusGeometry(11, track.id === 'orbit' ? .25 : .85, 6, 40, Math.PI), track.id === 'orbit' ? '#ffda71' : '#b3b798', [p[0], .1, p[1]], { emissive: track.id === 'orbit' ? '#ffac3a' : '#000000', emissiveIntensity: .65 });
-      hoop.rotation.y = Math.PI / 2 - Math.atan2(next[1] - p[1], next[0] - p[0]);
+    for (const fraction of [.25, .53, .82]) {
+      const p = pointAt(course, course.total * fraction);
+      const hoop = mesh(new THREE.TorusGeometry(11, track.id === 'orbit' ? .25 : .85, 6, 40, Math.PI), track.id === 'orbit' ? '#ffda71' : '#b3b798', [p.x, .1, p.z], { emissive: track.id === 'orbit' ? '#ffac3a' : '#000000', emissiveIntensity: .65 });
+      hoop.rotation.y = Math.PI / 2 - Math.atan2(p.tz, p.tx);
     }
   }
   // Soft bright cloud banks and striped hot-air balloons.

@@ -3,6 +3,7 @@ import { makeChair, animateChair } from './chairs.js';
 import { pilots } from './catalog.js';
 import { createSelection } from './selection.js';
 import { SnapshotBuffer, modelYaw } from './motion.js';
+import { compareRacers } from './racing.js';
 import { raceThemes } from './scenery.js';
 import { loadModels } from './model-assets.js';
 import { createRaceWorld, animateWorld } from './race-world.js';
@@ -16,7 +17,7 @@ const selection = createSelection(choices => send('configure', choices));
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let scene, camera, renderer, sun, effects, environment, models, preparedChair, world = new Map(), raf, keys = {};
 const snapshots = new SnapshotBuffer(100);
-let previousFrame = 0, cameraReady = false, builtTrack = null, lobbySignature = '', lastHudUpdate = 0;
+let previousFrame = 0, cameraReady = false, builtTrack = null, lobbySignature = '', lastHudUpdate = 0, finishPresentedAt = null;
 const cameraTarget = new THREE.Vector3(), cameraForward = new THREE.Vector3(), cameraDesired = new THREE.Vector3();
 const sunOffset = new THREE.Vector3(-28, 46, -18);
 
@@ -35,9 +36,10 @@ function connect() {
     }
     if (message.type !== 'state') return;
     const reset = state?.lobby.raceId !== message.lobby.raceId;
-    state = message;
+    state = { ...state, ...message };
+    state.lobby.track = state.tracks.find(track => track.id === state.lobby.trackId);
     snapshots.push(state, performance.now());
-    if (reset) { cameraReady = false; effects?.reset(); }
+    if (reset) { cameraReady = false; finishPresentedAt = null; effects?.reset(); }
     if (!lobby.classList.contains('hidden')) {
       const signature = JSON.stringify(state.racers.map(r => [r.id, r.name, r.pilotId]));
       if (signature !== lobbySignature) { lobbySignature = signature; renderLobby(); }
@@ -64,9 +66,9 @@ function buildWorld() {
   scene.environment = pmrem.fromScene(studio, .04).texture; scene.environmentIntensity = .32;
   studio.dispose(); pmrem.dispose();
   camera = new THREE.PerspectiveCamera(54, 1, .1, 450);
-  scene.add(new THREE.HemisphereLight('#e7f4ff', '#728297', 1.45));
+  scene.add(new THREE.HemisphereLight('#e7f4ff', '#657c87', 1.05));
   sun = new THREE.DirectionalLight('#fff0d7', 3.2); sun.castShadow = true;
-  sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = sun.shadow.camera.bottom = -26;
+  sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = sun.shadow.camera.bottom = -26;
   sun.shadow.camera.right = sun.shadow.camera.top = 26; sun.shadow.camera.near = 1; sun.shadow.camera.far = 115;
   sun.shadow.bias = -.0005; sun.shadow.normalBias = .05;
   scene.add(sun, sun.target); effects = createRaceEffects(scene);
@@ -77,9 +79,11 @@ function buildTrack(track = state.lobby.track) {
   if (environment) disposeObject(environment);
   builtTrack = track.id;
   const palette = raceThemes[builtTrack]; scene.fog.color.set(palette.fog);
-  const night = ['neon', 'metro'].includes(builtTrack); sun.color.set(night ? '#d3dcff' : '#fff0d7'); sun.intensity = night ? 2 : 3.2;
+  const night = ['neon', 'metro'].includes(builtTrack); sun.color.set(night ? '#c6d8ff' : '#fff0d7'); sun.intensity = night ? 1.8 : 2.6;
   environment = createRaceWorld(track, models); scene.add(environment);
   const points = track.route.map(p => p.join(',')).join(' ');
+  const xs = track.route.map(p => p[0]), zs = track.route.map(p => p[1]);
+  $('#raceMapRoute').closest('svg').setAttribute('viewBox', `${Math.min(...xs) - 12} ${Math.min(...zs) - 12} ${Math.max(...xs) - Math.min(...xs) + 24} ${Math.max(...zs) - Math.min(...zs) + 24}`);
   $('#raceMapRoute').setAttribute('points', points + ' ' + track.route[0].join(','));
 }
 function disposeObject(object) {
@@ -124,6 +128,7 @@ async function showRace() {
   selection.setVisible(false);
   lobby.classList.add('hidden'); result.classList.add('hidden'); race.classList.remove('hidden'); document.body.classList.add('in-race');
   $('#raceTrackName').textContent = state.lobby.track.name.toUpperCase();
+  $('#raceStatus').textContent = 'À TOI LA PISTE !';
   try { models = await loadModels(); }
   catch (error) { returnToGarage(); $('#menuStatus').textContent = 'Impossible de charger les modèles 3D. Réessaie après rechargement.'; console.error(error); return; }
   if (race.classList.contains('hidden')) return;
@@ -155,18 +160,28 @@ function draw3D(now) {
       if (other === object) continue;
       const behind = (other.position.x - object.position.x) * cameraForward.x + (other.position.z - object.position.z) * cameraForward.z < -1.2;
       const lateral = Math.abs((other.position.x - object.position.x) * -cameraForward.z + (other.position.z - object.position.z) * cameraForward.x);
-      const distance = other.position.distanceTo(camera.position), target = behind && lateral < 1.8 && distance < 7.5 ? .08 + .92 * Math.max(0, (distance - 4.5) / 3) : 1;
+      const distance = other.position.distanceTo(camera.position), target = behind && lateral < 1.8 && distance < 8.3 ? 0 : 1;
       const opacity = other.userData.cameraFade + (target - other.userData.cameraFade) * (1 - Math.exp(-15 * dt));
       other.userData.cameraFade = opacity;
       other.userData.cameraFadeUniform.value = opacity;
+      // Fully cull camera-obstructing racers after the brief transition, avoiding
+      // a permanent noisy semi-transparent silhouette across the player's vehicle.
+      other.visible = opacity >= .025;
     }
   }
-  renderer.render(scene, camera); raf = requestAnimationFrame(draw3D);
+  renderer.render(scene, camera);
+  if (object?.userData.pose.finished) {
+    finishPresentedAt ??= now;
+    $('#countdown').textContent = 'ARRIVÉE !';
+    $('#raceStatus').textContent = 'LIGNE FRANCHIE · COURSE TERMINÉE';
+    if (now - finishPresentedAt > 1200) { finish(); return; }
+  }
+  raf = requestAnimationFrame(draw3D);
 }
 function updateRaceUi() {
   if (!state) return;
   const me = state.racers.find(r => r.id === playerId) || state.racers.find(r => !r.isBot);
-  const sorted = [...state.racers].sort((a, b) => b.progress - a.progress);
+  const sorted = [...state.racers].sort(compareRacers);
   if (me) {
     $('#lapText').textContent = `TOUR ${Math.min(me.lap, state.lobby.laps)} / ${state.lobby.laps}`;
     $('#speedValue').textContent = Math.round(Math.abs(me.speed) * 3.6);
@@ -176,12 +191,19 @@ function updateRaceUi() {
     race.classList.toggle('boosting', me.boost > 0);
   }
   $('#raceClock').textContent = new Date(state.lobby.raceTime * 1000).toISOString().slice(14, 19) + '.' + Math.floor(state.lobby.raceTime * 10) % 10;
-  $('#countdown').textContent = state.lobby.countdown || '';
+  if (finishPresentedAt === null) $('#countdown').textContent = state.lobby.countdown || '';
   $('#ranking').innerHTML = sorted.map((r, i) => `<div class="rank ${r.id === playerId ? 'me' : ''}"><span>${String(i + 1).padStart(2, '0')} &nbsp; ${escapeHtml(r.name)}</span><small>${r.finished ? 'FINI' : `T${r.lap}`}</small></div>`).join('');
   $('#raceMapDots').innerHTML = state.racers.map(r => `<circle cx="${r.x}" cy="${r.z}" r="${r.id === playerId ? 4 : 2.5}" fill="${r.id === playerId ? '#ffdf3c' : '#e9f8ff'}" stroke="#0e274b" stroke-width="1.2"/>`).join('');
-  if (state.lobby.winner && state.racers.every(r => r.finished)) finish();
+  if (me?.finished && !result.classList.contains('hidden')) finish();
 }
-function finish() { document.body.classList.remove('in-race'); race.classList.add('hidden'); result.classList.remove('hidden'); const sorted = [...state.racers].sort((a, b) => b.progress - a.progress), place = sorted.findIndex(r => r.id === playerId); $('#resultTitle').textContent = place === 0 ? 'TU AS GAGNE.' : `#${place + 1}, BELLE COURSE.`; $('#resultCopy').textContent = `Victoire de ${state.lobby.winner}.`; $('#resultRanking').innerHTML = sorted.map((r, i) => `<div class="rank ${r.id === playerId ? 'me' : ''}"><span>${i + 1}. ${escapeHtml(r.name)}</span><small>${r.finished ? 'FINI' : ''}</small></div>`).join(''); }
+function finish() {
+  if (result.classList.contains('hidden')) { keys = {}; updateInput(); cancelAnimationFrame(raf); }
+  document.body.classList.remove('in-race'); race.classList.add('hidden'); result.classList.remove('hidden');
+  const sorted = [...state.racers].sort(compareRacers), place = sorted.findIndex(r => r.id === playerId);
+  $('#resultTitle').textContent = place === 0 ? 'TU AS GAGNÉ.' : `#${place + 1}, BELLE COURSE.`;
+  $('#resultCopy').textContent = `Victoire de ${sorted[0].name}. ${sorted.some(r => !r.finished) ? 'Les autres pilotes sont encore en piste.' : 'Classement final.'}`;
+  $('#resultRanking').innerHTML = sorted.map((r, i) => `<div class="rank ${r.id === playerId ? 'me' : ''}"><span>${i + 1}. ${escapeHtml(r.name)}</span><small>${r.finished ? `${Math.floor(r.finishTime / 60)}:${(r.finishTime % 60).toFixed(3).padStart(6, '0')}` : 'EN COURSE'}</small></div>`).join('');
+}
 function updateInput() {
   send('input', { input: {
     gas: !!(keys.w || keys.z || keys.arrowup), brake: !!(keys.s || keys.arrowdown),

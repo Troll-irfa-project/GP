@@ -10,7 +10,10 @@ export function createCourse(track) {
     const segment = { a, b, len, start: total, tx: (b[0] - a[0]) / len, tz: (b[1] - a[1]) / len };
     total += len; return segment;
   });
-  return { segments, total, width: track.width, boosts: [3, 8, 13].map(i => segments[i].start) };
+  const course = { segments, total, width: track.width, boosts: [.22, .51, .78].map(t => total * t) };
+  course.gates = Array.from({ length: 12 }, (_, i) => ({ ...pointAt(course, total * i / 12), halfWidth: i ? track.width + 6 : track.width }));
+  course.finishGate = course.gates[0];
+  return course;
 }
 
 export function pointAt(course, along, offset = 0) {
@@ -43,9 +46,48 @@ export function spawnRacer(r, i, course) {
     x: p.x, z: p.z, heading: Math.atan2(p.tz, p.tx), speed: 0, steer: 0,
     distance: along, progress: 0, lap: 1, lastAlong: wrap(along, course.total),
     finished: false, boost: 0, boostCooldown: 0, drift: 0, wasDrifting: false,
-    finishTime: null, recoveryCount: 0, recoveryFlash: 0,
+    finishTime: null, completedLaps: 0, lapStarted: false, nextCheckpoint: 0, recoveryCount: 0, recoveryFlash: 0,
     ai: { lane, stuck: 0, bestDistance: along, safeAlong: wrap(along, course.total) }
   });
+}
+
+// A swept crossing, in the correct direction, inside the actual gate. A reverse
+// crossing or going around its edge cannot count. Gates are shared with rendering.
+export function gateCrossing(gate, before, after) {
+  const from = (before.x - gate.x) * gate.tx + (before.z - gate.z) * gate.tz;
+  const to = (after.x - gate.x) * gate.tx + (after.z - gate.z) * gate.tz;
+  if (from > 0 || to <= 0 || to - from < 1e-8) return null;
+  const fraction = -from / (to - from);
+  const x = before.x + (after.x - before.x) * fraction, z = before.z + (after.z - before.z) * fraction;
+  if (Math.abs((x - gate.x) * -gate.tz + (z - gate.z) * gate.tx) > gate.halfWidth) return null;
+  return { x, z, fraction };
+}
+
+export function updateLapProgress(r, course, before, dt, laps, raceTime) {
+  if (r.finished) return;
+  // Exclude respawns/teleports; collision displacement is included in normal steps.
+  const moved = Math.hypot(r.x - before.x, r.z - before.z);
+  const crossing = moved <= Math.max(5, Math.abs(r.speed) * dt * 3) ? gateCrossing(course.gates[r.nextCheckpoint], before, r) : null;
+  if (crossing) {
+    if (r.nextCheckpoint === 0) {
+      if (r.lapStarted) r.completedLaps++;
+      else r.lapStarted = true; // Crossing from the grid starts, but never awards, lap 1.
+      if (r.completedLaps >= laps) {
+        r.finished = true; r.finishTime = raceTime - dt + crossing.fraction * dt;
+        r.x = crossing.x; r.z = crossing.z; r.speed = 0; r.boost = 0;
+      }
+    }
+    r.nextCheckpoint = (r.nextCheckpoint + 1) % course.gates.length;
+  }
+  const n = nearest(course, r.x, r.z, r.lastAlong);
+  const fraction = Math.min(n.along / course.total, (r.nextCheckpoint || course.gates.length) / course.gates.length);
+  r.progress = r.finished ? laps : r.lapStarted ? r.completedLaps + fraction : 0;
+  r.lap = Math.min(laps, r.completedLaps + 1);
+}
+
+export function compareRacers(a, b) {
+  if (a.finished !== b.finished) return a.finished ? -1 : 1;
+  return a.finished ? a.finishTime - b.finishTime : b.progress - a.progress;
 }
 
 export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
@@ -82,6 +124,14 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
     const turnSpeed = clamp(steeringRate(chair, 12) * 5.5 / angle, 8, speedLimit);
     speedLimit = Math.min(speedLimit, Math.sqrt(turnSpeed ** 2 + 2 * 10 * Math.max(0, ahead - lookahead)));
   }
+  // Rounded corners have many tiny vertices: anticipate their combined curvature.
+  for (const ahead of [6, 12, 20, 28]) {
+    const a = pointAt(course, n.along + ahead - 5), b = pointAt(course, n.along + ahead + 5);
+    const angle = Math.abs(angleDelta(Math.atan2(a.tz, a.tx), Math.atan2(b.tz, b.tx)));
+    if (angle < .25) continue;
+    const turnSpeed = clamp(steeringRate(chair, 12) * 5.5 / angle, 9, speedLimit);
+    speedLimit = Math.min(speedLimit, Math.sqrt(turnSpeed ** 2 + 20 * Math.max(0, ahead - lookahead)));
+  }
   if (Math.abs(error) > .75) speedLimit = Math.min(speedLimit, 11);
   if (Math.abs(error) > 1.15 || errorFromRoad > course.width - 1) speedLimit = Math.min(speedLimit, 4.5);
   // AI braking targets a positive speed; it must never engage reverse in a corner.
@@ -104,6 +154,7 @@ function recoverBot(r, course, racers) {
 }
 
 export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0) {
+  const previous = new Map(racers.map(r => [r.id, { x: r.x, z: r.z }]));
   for (const r of racers) {
     if (r.finished) continue;
     const chair = chairs.find(c => c.id === r.chairId);
@@ -137,14 +188,11 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0) {
     const delta = pathDelta(course, r.lastAlong, after.along);
     if (after.distance < course.width + 1 && Math.abs(delta) < Math.max(2, Math.abs(r.speed) * dt * 3)) r.distance += delta;
     r.lastAlong = after.along;
-    r.progress = Math.max(0, r.distance / course.total);
-    r.lap = Math.min(laps, Math.max(1, Math.floor(r.progress) + 1));
-    if (r.distance >= course.total * laps) { r.finished = true; r.progress = laps; r.finishTime = raceTime; r.speed = 0; }
     if (r.isBot) {
       if (after.distance < course.width - 2) r.ai.safeAlong = after.along;
       if (r.distance > r.ai.bestDistance + .7) { r.ai.bestDistance = r.distance; r.ai.stuck = 0; }
       else r.ai.stuck += dt;
-      if (!r.finished && r.ai.stuck > 5) recoverBot(r, course, racers);
+      if (r.ai.stuck > 5) { recoverBot(r, course, racers); previous.set(r.id, { x: r.x, z: r.z }); }
     }
   }
   for (let i = 0; i < racers.length; i++) for (let j = i + 1; j < racers.length; j++) {
@@ -165,4 +213,5 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0) {
       b.speed += closing * aw / total * (Math.cos(b.heading) * nx + Math.sin(b.heading) * nz);
     }
   }
+  for (const r of racers) updateLapProgress(r, course, previous.get(r.id), dt, laps, raceTime);
 }

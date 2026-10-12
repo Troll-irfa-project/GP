@@ -3,6 +3,9 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
+import { distanceToRoute } from '../public/motion.js';
+import { tracks } from '../public/catalog.js';
+import { createCourse } from '../public/racing.js';
 
 test('five 3D themes, drift particles, turbo and bounded rendering resources', { timeout: 120000 }, async () => {
   const port = 8102, url = `http://127.0.0.1:${port}`;
@@ -22,6 +25,9 @@ test('five 3D themes, drift particles, turbo and bounded rendering resources', {
         if (!root || !player) return;
         const particles = scene.getObjectByName('pooled-race-vfx'), sizes = particles.geometry.attributes.size.array;
         const row = { track: root.userData.trackId, steer: player.userData.pose.steer, lean: player.userData.animation.lean, speed: player.userData.pose.speed, boost: player.userData.pose.boost, drift: player.userData.pose.drift, particles: sizes.filter(v => v > .01).length, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures };
+        const line = root.getObjectByName('finish-line');
+        row.finishLine = { x: line.position.x, z: line.position.z, width: line.geometry.parameters.width };
+        row.footprints = root.userData.dressingFootprints;
         window.lastRender = row; window.renderHistory.push(row); if (window.renderHistory.length > 1000) window.renderHistory.shift();
       };
     });
@@ -34,7 +40,12 @@ test('five 3D themes, drift particles, turbo and bounded rendering resources', {
       await page.waitForFunction(id => window.lastRender?.track === id && document.querySelector('#countdown').textContent === '', track);
       await page.keyboard.down('w'); await page.waitForTimeout(3100); await page.keyboard.up('w');
       await page.screenshot({ path: `test-results/race-${track}-art.png` });
-      const metrics = await page.evaluate(() => window.lastRender); results.push(metrics);
+      const metrics = await page.evaluate(() => window.lastRender);
+      const catalogTrack = tracks.find(t => t.id === track), course = createCourse(catalogTrack);
+      assert.equal(metrics.finishLine.x, course.finishGate.x); assert.equal(metrics.finishLine.z, course.finishGate.z);
+      assert.equal(metrics.finishLine.width, course.finishGate.halfWidth * 2);
+      for (const prop of metrics.footprints) assert.ok(distanceToRoute(prop.x, prop.z, catalogTrack.route) > catalogTrack.width + prop.radius + 2, `${track}: ${prop.kind} must stay outside the track`);
+      delete metrics.footprints; results.push(metrics);
       assert.ok(metrics.calls < 240, `${track} draw calls: ${metrics.calls}`);
       assert.ok(metrics.triangles < 600000, `${track} triangle budget: ${metrics.triangles}`);
       assert.ok(metrics.geometries < 450, `${track} geometry budget: ${metrics.geometries}`);
@@ -42,9 +53,11 @@ test('five 3D themes, drift particles, turbo and bounded rendering resources', {
     const first = results[0], last = results.at(-1);
     assert.ok(last.textures <= first.textures + 6, 'track replay releases obsolete textures');
     await page.keyboard.down('w'); await page.keyboard.down('ArrowRight'); await page.keyboard.down('Space');
-    await page.waitForTimeout(490);
+    // Observe the real charge, not a wall-clock sleep that can miss the boost
+    // threshold under GPU/CI load or during a collision on the starting straight.
+    await page.waitForFunction(() => window.lastRender.drift > .5 && window.lastRender.particles > 0, undefined, { timeout: 5000 });
     await page.keyboard.up('Space'); await page.keyboard.up('ArrowRight');
-    await page.waitForFunction(() => window.renderHistory.some(r => r.boost > .05 && r.particles > 0), { timeout: 4000 });
+    await page.waitForFunction(() => window.renderHistory.some(r => r.boost > .05 && r.particles > 0), undefined, { timeout: 5000 });
     await page.screenshot({ path: 'test-results/race-turbo-art.png' }); await page.keyboard.up('w');
     const animation = await page.evaluate(() => window.renderHistory);
     assert.ok(animation.some(r => Math.abs(r.lean) > .015), 'body responds to steering');

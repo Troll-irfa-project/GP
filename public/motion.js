@@ -74,6 +74,8 @@ export class SnapshotBuffer {
     out.heading = a.heading + angleDelta(a.heading, b.heading) * alpha;
     for (const key of ['speed', 'steer', 'boost', 'drift']) out[key] = (a[key] || 0) + ((b[key] || 0) - (a[key] || 0)) * alpha;
     out.drifting = alpha < .5 ? Boolean(a.wasDrifting) : Boolean(b.wasDrifting);
+    // Reveal the result only when the interpolated vehicle has reached the line.
+    out.finished = Boolean(a.finished || alpha >= 1 && b.finished);
     return true;
   }
 }

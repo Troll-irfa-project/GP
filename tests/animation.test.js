@@ -43,3 +43,10 @@ test('animation inputs interpolate with network positions', () => {
   const pose = {}; buffer.sample('p', 50, pose);
   assert.equal(pose.speed, 10); assert.equal(pose.steer, 0); assert.equal(pose.boost, .5); assert.equal(pose.drifting, true);
 });
+
+test('finish flag waits for the same delayed snapshot as the finish-line position', () => {
+  const buffer = new SnapshotBuffer(100), pose = {};
+  for (const [time, x, finished] of [[0,-2,false],[100,0,true],[200,0,true]]) buffer.push({lobby:{raceId:1},serverTime:time,racers:[{id:'p',x,z:0,heading:0,finished}]},time);
+  buffer.sample('p',150,pose); assert.equal(pose.x,-1); assert.equal(pose.finished,false);
+  buffer.sample('p',200,pose); assert.equal(pose.x,0); assert.equal(pose.finished,true);
+});

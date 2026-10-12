@@ -1,4 +1,4 @@
-const route=[[-8,-58],[35,-58],[48,-44],[50,-18],[34,-4],[15,-2],[8,12],[28,28],[20,46],[-8,54],[-34,47],[-46,30],[-45,6],[-28,-4],[-12,-8],[-18,-25],[-42,-34],[-40,-49]];
+import { trackLayouts } from './track-layouts.js';
 export const chairs=[
  {id:'comet',name:'Comète',tag:'Vitesse',color:'#ff6b52',speed:10,accel:8,handling:6,offroad:4,weight:7},
  {id:'atlas',name:'Atlas',tag:'Impact',color:'#f6c453',speed:6,accel:6,handling:6,offroad:7,weight:10},
@@ -17,9 +17,9 @@ export const pilots = [
  {id:'sofia',name:'Sofia Morel',short:'Sofia',role:'Le calme avant le turbo',color:'#ede0b8',skin:'#b9825c',hair:'#ead39d',style:'bob',portrait:6},
 ];
 export const tracks=[
- {id:'neon',name:'Boucle Néon',subtitle:'Raccourci sous le pont',hue:168,width:6.2,route},
- {id:'coast',name:'Côte Azur',subtitle:'Épingles et boost marin',hue:196,width:6.0,route:route.map(([x,z])=>[x*1.08,z*.82])},
- {id:'metro',name:'Métro Fantôme',subtitle:'Rails, tunnel et chicanes',hue:270,width:5.8,route:route.map(([x,z])=>[x*.82,z*1.05])},
- {id:'garden',name:'Jardin Turbo',subtitle:'Berges et tremplins',hue:108,width:6.6,route:route.map(([x,z])=>[x*1.05,z*.9])},
- {id:'orbit',name:'Orbital 9',subtitle:'Le grand tour suspendu',hue:310,width:5.7,route:route.map(([x,z])=>[x*1.16,z*.88])}
+ {id:'neon',name:'Boucle Néon',subtitle:'Boulevards rapides et double chicane',hue:168,width:6.2,route:trackLayouts.neon},
+ {id:'coast',name:'Côte Azur',subtitle:'Corniche, baie et virages en S',hue:196,width:6.0,route:trackLayouts.coast},
+ {id:'metro',name:'Métro Fantôme',subtitle:'Tunnel, épingle et grande ligne droite',hue:270,width:5.8,route:trackLayouts.metro},
+ {id:'garden',name:'Jardin Turbo',subtitle:'Courbes fluides et enchaînements techniques',hue:108,width:6.6,route:trackLayouts.garden},
+ {id:'orbit',name:'Orbital 9',subtitle:'Grandes courbes et retour en épingle',hue:310,width:5.7,route:trackLayouts.orbit}
 ];

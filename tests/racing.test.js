@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { chairs, tracks } from '../public/catalog.js';
-import { createCourse, spawnRacer, stepRace, nearest, pointAt } from '../public/racing.js';
+import { createCourse, spawnRacer, stepRace, nearest, pointAt, updateLapProgress, gateCrossing, compareRacers } from '../public/racing.js';
 const dt = 1 / 60;
 
 for (const track of tracks) test(`six bots finish three laps on ${track.id} without recovery or prolonged excursions`, () => {
@@ -27,6 +27,12 @@ for (const track of tracks) test(`six bots finish three laps on ${track.id} with
   assert.ok(racers.every(r => r.recoveryCount === 0), 'normal racing should not rely on teleportation');
   assert.ok(Math.max(...longestOff) < 2, 'no sustained wall driving or off-road shortcut');
   assert.ok(racers.every(r => r.finishTime > course.total * 3 / 33), 'no free laps at the start');
+  for (const r of racers) {
+    const gate = course.finishGate;
+    assert.equal(r.completedLaps, 3);
+    assert.ok(Math.abs((r.x - gate.x) * gate.tx + (r.z - gate.z) * gate.tz) < 1e-8, 'final pose is on the painted finish line');
+    assert.ok(Math.abs((r.x - gate.x) * -gate.tz + (r.z - gate.z) * gate.tx) <= track.width);
+  }
 });
 
 test('a displaced, wrong-way bot returns to the track and completes its lap', () => {
@@ -62,4 +68,69 @@ test('bot passes a stationary racer instead of repeatedly driving into it', () =
   for(let t=0;t<20 && r.distance<40;t+=dt) stepRace([r, obstacle],course,chairs,dt,3,t);
   assert.ok(r.distance > 40, 'bot must get past the obstruction');
   assert.equal(r.recoveryCount, 0, 'must actually drive around, not teleport');
+});
+
+test('five non-affine layouts have a straight finish, smooth bends and long straights', () => {
+  const signatures = [];
+  for (const track of tracks) {
+    const course = createCourse(track), gate = course.finishGate, before = pointAt(course, -12), after = pointAt(course, 12);
+    assert.ok(course.total > 350);
+    assert.ok(course.segments.some(s => s.len > 27));
+    assert.ok(track.route.length > 75);
+    assert.ok(Math.abs(before.tz - gate.tz) < 1e-8 && Math.abs(after.tz - gate.tz) < 1e-8);
+    signatures.push(Array.from({length: 16}, (_, i) => { const p = pointAt(course, course.total * i / 16); return [p.tx.toFixed(2), p.tz.toFixed(2)]; }));
+  }
+  assert.equal(new Set(signatures.map(s => JSON.stringify(s))).size, 5);
+});
+
+test('laps require ordered checkpoints and directional crossings, not a distance counter', () => {
+  const course = createCourse(tracks[1]), r = {id:'human',chairId:'comet',isBot:false};
+  spawnRacer(r, 0, course);
+  function cross(index, { lateral = 0, reverse = false } = {}) {
+    const g = course.gates[index], sign = reverse ? -1 : 1;
+    const before = { x:g.x - g.tx * sign * .3 - g.tz * lateral, z:g.z - g.tz * sign * .3 + g.tx * lateral };
+    r.x = g.x + g.tx * sign * .3 - g.tz * lateral; r.z = g.z + g.tz * sign * .3 + g.tx * lateral;
+    r.lastAlong = course.total * index / course.gates.length; r.speed = 18;
+    updateLapProgress(r, course, before, 1 / 30, 3, 10);
+  }
+  cross(0);
+  assert.equal(r.lapStarted, true); assert.equal(r.completedLaps, 0);
+  r.distance = course.total * 999; // Historical odometer drift cannot end a race.
+  cross(0); cross(0, {reverse:true}); cross(0);
+  assert.equal(r.completedLaps, 0); assert.equal(r.finished, false);
+  cross(2); assert.equal(r.nextCheckpoint, 1, 'cannot skip checkpoint 1');
+  for (let lap = 0; lap < 3; lap++) {
+    for (let index = 1; index < course.gates.length; index++) cross(index);
+    cross(0, {reverse:true}); assert.equal(r.completedLaps, lap);
+    cross(0, {lateral:course.width + 1}); assert.equal(r.completedLaps, lap, 'outside the painted line does not count');
+    cross(0, {lateral:2}); assert.equal(r.completedLaps, lap + 1);
+  }
+  assert.equal(r.finished, true); assert.equal(r.progress, 3);
+  assert.ok(Math.abs(r.finishTime - (10 - 1 / 60)) < 1e-8, 'crossing time is interpolated inside the physics tick');
+  assert.equal(r.x, course.finishGate.x);
+});
+
+test('gate sweep rejects reverse, out-of-bounds and teleport crossings', () => {
+  const course = createCourse(tracks[0]), g = course.finishGate;
+  assert.equal(gateCrossing(g, {x:g.x+1,z:g.z}, {x:g.x-1,z:g.z}), null);
+  assert.equal(gateCrossing(g, {x:g.x-1,z:g.z+20}, {x:g.x+1,z:g.z+20}), null);
+  const r = {id:'teleport',chairId:'comet'}; spawnRacer(r,0,course);
+  r.x = g.x + 20; r.z = g.z;
+  updateLapProgress(r,course,{x:g.x-20,z:g.z},dt,3,1);
+  assert.equal(r.lapStarted,false);
+});
+
+test('collision movement through the finish is counted after collision resolution', () => {
+  const course = createCourse(tracks[0]), a = {id:'a',chairId:'comet',input:{}}, b = {id:'b',chairId:'atlas',input:{}};
+  spawnRacer(a,0,course); spawnRacer(b,1,course);
+  for (const r of [a,b]) Object.assign(r,{x:course.finishGate.x-.2,z:course.finishGate.z,heading:0,lastAlong:course.total-.2,completedLaps:2,lapStarted:true,nextCheckpoint:0});
+  // The heavier second racer is pushed forwards while the first is pushed back.
+  stepRace([a,b],course,chairs,dt,3,100);
+  assert.equal(b.finished,true); assert.equal(a.finished,false);
+  assert.equal(b.x,course.finishGate.x);
+});
+
+test('finished racers are ordered by crossing time, never by tied progress', () => {
+  const racers = [{id:'late',finished:true,progress:3,finishTime:91},{id:'unfinished',finished:false,progress:2.99},{id:'winner',finished:true,progress:3,finishTime:84}];
+  assert.deepEqual(racers.sort(compareRacers).map(r=>r.id),['winner','late','unfinished']);
 });

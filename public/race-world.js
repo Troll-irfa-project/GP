@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { distanceToRoute, treePlacements } from './motion.js';
 import { decorateTrack, raceThemes } from './scenery.js';
 import { groundHeight, islandEdge } from './environment-math.js';
+import { createCourse, pointAt } from './racing.js';
+import { dressCircuit } from './track-dressing.js';
 
 export function canvasTexture(size, draw) {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = size;
@@ -64,36 +66,35 @@ function sky(root, palette) {
 
 export function createRaceWorld(track, models) {
   const root = new THREE.Group(); root.name = 'trackWorld'; root.userData.trackId = track.id;
-  const palette = raceThemes[track.id]; sky(root, palette); root.add(terrain(track, palette));
+  const palette = raceThemes[track.id], course = createCourse(track); sky(root, palette); root.add(terrain(track, palette));
   const texture = roadTexture(); texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   root.add(ribbon(track.route, track.width + 1.05, .23, mat('#f3e3bc')));
   root.add(ribbon(track.route, track.width + .64, .32, mat('#ed5c61')));
   root.add(ribbon(track.route, track.width, .40, mat('#ffffff', { map: texture, roughness: .94 })));
   const white = [], red = [], dashes = [];
-  for (let i = 0; i < track.route.length; i++) {
-    const a = track.route[i], b = track.route[(i + 1) % track.route.length], dx = b[0] - a[0], dz = b[1] - a[1], length = Math.hypot(dx, dz), angle = Math.atan2(dz, dx), steps = Math.ceil(length / 2.6);
-    for (let j = 0; j < steps; j++) {
-      const u = (j + .5) / steps, x = a[0] + dx * u, z = a[1] + dz * u;
-      for (const side of [-1, 1]) (j % 2 ? red : white).push({ position: [x - dz / length * (track.width + .32) * side, .43, z + dx / length * (track.width + .32) * side], scale: [.63, .13, length / steps - .04], angle: Math.PI / 2 - angle });
-      if (j % 3 === 0) dashes.push({ position: [x, .417, z], scale: [.15, .012, 1.7], angle: Math.PI / 2 - angle });
-    }
+  const steps = Math.ceil(course.total / 2.4), spacing = course.total / steps;
+  for (let j = 0; j < steps; j++) {
+    const p = pointAt(course, (j + .5) * spacing), angle = Math.PI / 2 - Math.atan2(p.tz, p.tx);
+    for (const side of [-1, 1]) (j % 2 ? red : white).push({ position: [p.x - p.tz * (track.width + .32) * side, .43, p.z + p.tx * (track.width + .32) * side], scale: [.63, .13, spacing + .08], angle });
+    if (j % 3 === 1) dashes.push({ position: [p.x, .417, p.z], scale: [.15, .012, 1.7], angle });
   }
   instances(root, new THREE.BoxGeometry(1, 1, 1), mat('#fff3dc'), white, 'white-curbs');
   instances(root, new THREE.BoxGeometry(1, 1, 1), mat('#ec4e56'), red, 'red-curbs');
   instances(root, new THREE.BoxGeometry(1, 1, 1), mat('#f5eed9'), dashes, 'road-markings');
-  const p = track.route[0], next = track.route[1], startYaw = Math.PI / 2 - Math.atan2(next[1] - p[1], next[0] - p[0]);
-  const checkered = canvasTexture(256, (ctx, s) => { for (let x = 0; x < 8; x++) for (let y = 0; y < 8; y++) { ctx.fillStyle = (x + y) % 2 ? '#1b2943' : '#fff5d5'; ctx.fillRect(x * s / 8, y * s / 8, s / 8, s / 8); } });
-  const line = new THREE.Mesh(new THREE.PlaneGeometry(track.width * 2, 1.6), mat('#ffffff', { map: checkered })); line.rotation.set(-Math.PI / 2, 0, startYaw); line.position.set(p[0], .425, p[1]); root.add(line);
+  const gate = course.finishGate, startYaw = Math.PI / 2 - Math.atan2(gate.tz, gate.tx);
+  const checkered = canvasTexture(256, (ctx, s) => { for (let x = 0; x < 16; x++) for (let y = 0; y < 2; y++) { ctx.fillStyle = (x + y) % 2 ? '#1b2943' : '#fff5d5'; ctx.fillRect(x * s / 16, y * s / 2, s / 16, s / 2); } });
+  const line = new THREE.Mesh(new THREE.PlaneGeometry(gate.halfWidth * 2, 1.6), mat('#ffffff', { map: checkered })); line.name = 'finish-line'; line.userData.gate = gate; line.rotation.set(-Math.PI / 2, 0, startYaw); line.position.set(gate.x, .425, gate.z); root.add(line);
   const boostTexture = canvasTexture(256, (ctx, s) => { ctx.fillStyle = '#122e63'; ctx.fillRect(0, 0, s, s); ctx.strokeStyle = '#68f2ff'; ctx.lineWidth = 24; for (let y = -60; y < 350; y += 90) { ctx.beginPath(); ctx.moveTo(20, y + 40); ctx.lineTo(128, y); ctx.lineTo(236, y + 40); ctx.stroke(); } });
   const boostMaterial = mat('#ffffff', { map: boostTexture, emissive: '#59bbff', emissiveMap: boostTexture, emissiveIntensity: .7 });
-  for (const index of [3, 8, 13]) {
-    const a = track.route[index], b = track.route[(index + 1) % track.route.length], pad = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 3.4), boostMaterial);
-    pad.rotation.set(-Math.PI / 2, 0, Math.PI / 2 - Math.atan2(b[1] - a[1], b[0] - a[0])); pad.position.set(a[0], .43, a[1]); root.add(pad);
+  for (const along of course.boosts) {
+    const p = pointAt(course, along), pad = new THREE.Mesh(new THREE.PlaneGeometry(5.6, 3.4), boostMaterial);
+    pad.rotation.set(-Math.PI / 2, 0, Math.PI / 2 - Math.atan2(p.tz, p.tx)); pad.position.set(p.x, .43, p.z); root.add(pad);
   }
   // Retain explicit safe footprints for tests and diagnostics; visible trees are batched below.
   root.userData.treePlacements = treePlacements(track.route);
   for (const tree of root.userData.treePlacements) { const marker = new THREE.Group(); marker.name = 'tree'; marker.position.set(tree.x, 0, tree.z); marker.userData.radius = tree.radius; root.add(marker); }
   decorateTrack(THREE, root, track, models);
+  dressCircuit(root, track, course, palette);
   root.userData.boostMaterial = boostMaterial; return root;
 }
 
