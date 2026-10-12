@@ -1,0 +1,18 @@
+{
+  "name": "roll-rush-arena",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test tests/motion.test.js tests/racing.test.js tests/selection.test.js tests/animation.test.js",
+    "test:browser": "node --test --test-concurrency=1 tests/browser.test.js tests/rendering.test.js"
+  },
+  "dependencies": {
+    "three": "^0.170.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.0"
+  }
+}

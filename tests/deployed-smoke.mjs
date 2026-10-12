@@ -1,0 +1,43 @@
+import { chromium } from '@playwright/test';
+import assert from 'node:assert/strict';
+
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-swiftshader'] });
+try {
+  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const errors = [], failed = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error' && /THREE|WebGL|shader|GLTF/i.test(message.text())) errors.push(message.text()); });
+  page.on('response', response => { if (response.status() >= 400 && !response.url().endsWith('favicon.ico')) failed.push(response.url()); });
+  await page.goto(process.env.GAME_TEST_URL || 'http://localhost:8080');
+  await page.locator('.pilot-card').first().waitFor();
+  await page.evaluate(() => document.fonts.ready);
+  assert.equal(await page.evaluate(() => document.fonts.check('16px Race')), true);
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.locator('#garageStep').click();
+    await page.locator('#pilotTab').click();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    if (viewport.width > 700) {
+      const details = await page.locator('#garageContent .selection-details').boundingBox(), dock = await page.locator('.selection-dock').boundingBox();
+      assert.ok(details.y + details.height < dock.y, `details must not overlap roster at ${viewport.width}px`);
+    }
+    await page.locator('#continueButton').click();
+    await page.locator('[data-chair="atlas"]').click();
+    await page.locator('#continueButton').click();
+    await page.locator('[data-track="garden"]').click();
+    assert.equal(await page.locator('#trackName').textContent(), 'Jardin Turbo');
+    assert.ok(await page.locator('#startButton').isEnabled());
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+  }
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.locator('#startButton').click();
+  await page.locator('#game').waitFor();
+  await page.waitForFunction(() => document.querySelector('#raceMapDots').children.length === 6 && document.querySelector('#countdown').textContent === '');
+  await page.keyboard.down('w'); await page.waitForTimeout(2300); await page.keyboard.up('w');
+  assert.ok(Number(await page.locator('#speedValue').textContent()) > 10);
+  const canvas = await page.locator('#game').boundingBox(); assert.equal(canvas.width, 1440); assert.equal(canvas.height, 900);
+  await page.screenshot({ path: 'test-results/deployed-race.png' });
+  await page.locator('#backButton').click();
+  assert.deepEqual(errors, []); assert.deepEqual(failed, []);
+  console.log('Docker smoke OK: local GLB assets, shaders, full-screen racing with 6 racers, local font, 3 selection screens, 1440/1024/390px, no browser errors.');
+} finally { await browser.close(); }

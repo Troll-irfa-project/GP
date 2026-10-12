@@ -1,0 +1,116 @@
+import { chairs, pilots, tracks } from './catalog.js';
+import { silhouettes } from './chairs.js';
+import { createGarage } from './garage.js';
+
+const $ = selector => document.querySelector(selector);
+const stats = [['Vitesse max.', 'speed'], ['Accélération', 'accel'], ['Maniabilité', 'handling'], ['Hors-piste', 'offroad'], ['Poids / impact', 'weight']];
+const themes = {
+  coast: { label: 'GRAND PRIX DU LITTORAL', description: 'Soleil, embruns et virages serrés.', difficulty: 2, tip: 'Garde de la vitesse dans les grandes courbes. Anticipe le freinage avant les épingles.' },
+  neon: { label: 'GRAND PRIX NOCTURNE', description: 'La ville s’illumine. La course aussi.', difficulty: 3, tip: 'Les longues lignes droites récompensent la vitesse. Prépare ta trajectoire avant chaque enchaînement.' },
+  metro: { label: 'GRAND PRIX SOUTERRAIN', description: 'Un rythme serré, une trajectoire précise.', difficulty: 4, tip: 'Le tracé le plus étroit : privilégie la maniabilité et garde une marge pour les dépassements.' },
+  garden: { label: 'GRAND PRIX NATURE', description: 'Une parenthèse verte. À pleine vitesse.', difficulty: 2, tip: 'La piste est plus large : essaie plusieurs trajectoires et utilise toute la largeur dans les courbes.' },
+  orbit: { label: 'GRAND PRIX CÉLESTE', description: 'La tête dans les nuages. Les yeux sur la piste.', difficulty: 4, tip: 'Un tour plus long et une piste étroite. La régularité vaut autant que la vitesse de pointe.' },
+};
+const orderedTracks = ['coast', 'neon', 'garden', 'metro', 'orbit'].map(id => tracks.find(t => t.id === id));
+const pad = n => String(n).padStart(2, '0');
+
+export function createSelection(onChange) {
+  let screen = 'pilot', chairId = 'comet', pilotId = 'hawking', trackId = 'coast', garage, ready = false, visible = true;
+  let populated = false, rosterSignature = '';
+  const choices = () => ({ chairId, pilotId, trackId });
+  const listFor = () => screen === 'pilot' ? pilots : screen === 'chair' ? chairs : orderedTracks;
+  const idFor = () => screen === 'pilot' ? pilotId : screen === 'chair' ? chairId : trackId;
+  function populate() {
+    if (populated) return; populated = true;
+    $('#pilots').innerHTML = pilots.map(p => `<button class="pilot-card" data-pilot="${p.id}" aria-label="Choisir ${p.name}" aria-pressed="false"><span class="portrait" style="background-position:${p.portrait % 4 * 100 / 3}% ${Math.floor(p.portrait / 4) * 100}%"></span><span class="card-name">${p.name}</span></button>`).join('');
+    $('#chairs').innerHTML = chairs.map(c => `<button class="chair-card" data-chair="${c.id}" aria-label="Choisir le fauteuil ${c.name}" aria-pressed="false"><img alt="" width="320" height="180"/><span class="card-name">${c.name}<small>${c.tag.toUpperCase()} · 35 POINTS</small></span></button>`).join('');
+    $('#tracks').innerHTML = orderedTracks.map(t => `<button class="track-card" data-track="${t.id}" aria-label="Choisir ${t.name}" aria-pressed="false"><img src="/assets/${t.id}-menu.png" alt="" width="320" height="180" loading="lazy"/><span class="card-name">${t.name}<small>3 TOURS · 6 PILOTES</small></span></button>`).join('');
+    $('#pilots').addEventListener('click', e => { const card = e.target.closest('[data-pilot]'); if (card) choose(card.dataset.pilot); });
+    $('#chairs').addEventListener('click', e => { const card = e.target.closest('[data-chair]'); if (card) choose(card.dataset.chair); });
+    $('#tracks').addEventListener('click', e => { const card = e.target.closest('[data-track]'); if (card) choose(card.dataset.track); });
+    try {
+      garage = createGarage($('#garagePreview'));
+      const thumbs = garage.thumbnails(chairs, pilots[0]);
+      for (const card of document.querySelectorAll('.chair-card')) card.querySelector('img').src = thumbs.get(card.dataset.chair);
+    } catch (error) {
+      console.warn('3D preview unavailable:', error);
+      $('#menuStatus').textContent = 'Aperçu indisponible : WebGL doit être activé pour jouer.';
+    }
+  }
+  function choose(id) {
+    if (screen === 'pilot') pilotId = id;
+    else if (screen === 'chair') chairId = id;
+    else trackId = id;
+    onChange(choices()); render();
+  }
+  function show(next, focus = false) {
+    screen = next; render();
+    if (focus) document.querySelector(`#${next === 'pilot' ? 'pilots' : next === 'chair' ? 'chairs' : 'tracks'} .active`)?.focus({ preventScroll: true });
+  }
+  function render() {
+    populate();
+    const isTrack = screen === 'track', isChair = screen === 'chair';
+    const pilot = pilots.find(p => p.id === pilotId), chair = chairs.find(c => c.id === chairId), track = tracks.find(t => t.id === trackId), theme = themes[trackId];
+    $('#lobby').dataset.screen = screen;
+    $('#garageContent').classList.toggle('hidden', isTrack); $('#circuitContent').classList.toggle('hidden', !isTrack);
+    $('#pilots').classList.toggle('hidden', screen !== 'pilot'); $('#chairs').classList.toggle('hidden', !isChair); $('#tracks').classList.toggle('hidden', !isTrack);
+    $('#continueButton').classList.toggle('hidden', isTrack); $('#startButton').classList.toggle('hidden', !isTrack);
+    $('#selectionBack').classList.toggle('hidden', !isTrack); $('#nameField').classList.toggle('hidden', isTrack);
+    $('#selectionTitle').innerHTML = isTrack ? 'CHOIX DU <em>CIRCUIT</em>' : isChair ? 'CHOIX DU <em>FAUTEUIL</em>' : 'CHOIX DU <em>PILOTE</em>';
+    $('#continueButton').innerHTML = isChair ? 'CHOISIR LE CIRCUIT <span>❯</span>' : 'CHOISIR LE FAUTEUIL <span>❯</span>';
+    $('#selectionKicker').textContent = isChair ? 'UNE MACHINE, TON STYLE' : 'LE GARAGE / PERSONNAGE';
+    $('#selectionName').textContent = isChair ? chair.name : pilot.name;
+    $('#selectionQuote').textContent = isChair ? silhouettes[chairId].label : pilot.role;
+    $('#equippedChair').textContent = `${chair.name.toUpperCase()}${isChair ? ` / ${pilot.short.toUpperCase()}` : ''}`;
+    $('#chairSpecialty').textContent = chair.tag.toUpperCase();
+    $('#selectedStats').innerHTML = stats.map(([label, key]) => `<div class="stat-row"><span>${label}</span><div class="stat-track" role="meter" aria-label="${label}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${chair[key]}">${Array.from({ length: 10 }, (_, i) => `<i class="${i < chair[key] ? 'on' : ''}"></i>`).join('')}</div><strong>${chair[key]}/10</strong></div>`).join('');
+    $('#selectionNote').textContent = isChair ? '5 statistiques, 35 points pour chaque fauteuil. À toi de choisir le compromis.' : 'Le personnage change le style. Le fauteuil fait les performances.';
+    for (const [id, active] of [['pilotTab', !isChair], ['chairTab', isChair]]) { $(`#${id}`).classList.toggle('active', active); $(`#${id}`).setAttribute('aria-pressed', active); }
+    for (const [id, active] of [['garageStep', !isTrack], ['circuitStep', isTrack]]) { $(`#${id}`).classList.toggle('current', active); if (active) $(`#${id}`).setAttribute('aria-current', 'step'); else $(`#${id}`).removeAttribute('aria-current'); }
+    for (const [kind, selected] of [['pilot', pilotId], ['chair', chairId], ['track', trackId]]) for (const card of document.querySelectorAll(`[data-${kind}]`)) {
+      const active = card.dataset[kind] === selected; card.classList.toggle('active', active); card.setAttribute('aria-pressed', active);
+    }
+    $('#dockLabel').textContent = isTrack ? 'CHOISIS TON TERRAIN DE JEU' : isChair ? 'CHOISIS TON FAUTEUIL' : 'CHOISIS TON PERSONNAGE';
+    const items = listFor(); $('#selectionCount').textContent = `${pad(items.findIndex(item => item.id === idFor()) + 1)} / ${pad(items.length)}`;
+    const background = `/assets/${isTrack ? trackId : 'coast'}-menu.png`;
+    if ($('#menuBackdrop').dataset.source !== background) { $('#menuBackdrop').style.backgroundImage = `url('${background}')`; $('#menuBackdrop').dataset.source = background; }
+    $('#trackName').textContent = track.name; $('#trackKicker').textContent = theme.label;
+    $('#trackDescription').textContent = theme.description; $('#trackTip').textContent = theme.tip;
+    const length = track.route.reduce((sum, point, i) => { const next = track.route[(i + 1) % track.route.length]; return sum + Math.hypot(next[0] - point[0], next[1] - point[1]); }, 0);
+    $('#trackLength').textContent = `${Math.round(length)} m`;
+    $('#trackDifficulty').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < theme.difficulty ? 'on' : ''}"></i>`).join('');
+    $('#trackDifficulty').setAttribute('aria-label', `${theme.difficulty} sur 5`);
+    const route = track.route.map(p => p.join(',')).join(' '), start = track.route[0];
+    $('#trackRoute').innerHTML = `<polyline points="${route} ${start.join(',')}" fill="none" stroke="#05172f" stroke-width="11" stroke-linejoin="round"/><polyline points="${route} ${start.join(',')}" fill="none" stroke="#f9dc50" stroke-width="5" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="5" fill="white" stroke="#0c2544" stroke-width="2"/>`;
+    garage?.update(chair, pilot); garage?.setActive(visible && !isTrack);
+    $('#continueButton').disabled = !ready; $('#startButton').disabled = !ready;
+  }
+  $('#pilotTab').onclick = () => show('pilot'); $('#chairTab').onclick = () => show('chair');
+  $('#garageStep').onclick = () => show('pilot'); $('#circuitStep').onclick = () => show('track');
+  $('#continueButton').onclick = () => show(screen === 'pilot' ? 'chair' : 'track', true);
+  $('#selectionBack').onclick = () => show('chair', true);
+  function move(direction) { const items = listFor(), index = items.findIndex(item => item.id === idFor()); choose(items[(index + direction + items.length) % items.length].id); const card = document.querySelector(`#${screen === 'pilot' ? 'pilots' : screen === 'chair' ? 'chairs' : 'tracks'} .active`); card?.focus({ preventScroll: true }); if (innerWidth <= 700) card?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); }
+  $('#previousChoice').onclick = () => move(-1); $('#nextChoice').onclick = () => move(1);
+  document.addEventListener('keydown', e => {
+    if (!visible || e.target instanceof HTMLInputElement || e.repeat) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { e.preventDefault(); move(e.key === 'ArrowLeft' ? -1 : 1); }
+    if (e.key === 'Escape') { e.preventDefault(); show(screen === 'track' ? 'chair' : 'pilot', true); }
+  });
+  return {
+    choices,
+    show,
+    setVisible(value) { visible = value; garage?.setActive(value && screen !== 'track'); },
+    setReady(value) { ready = value; $('#continueButton').disabled = !value; $('#startButton').disabled = !value; },
+    update(state) {
+      if (!populated) render();
+      const racers = state?.racers || [], signature = JSON.stringify(racers.map(r => [r.id, r.name, r.isBot]));
+      if (signature === rosterSignature) return; rosterSignature = signature;
+      $('#slots').replaceChildren(...Array.from({ length: 6 }, (_, i) => {
+        const r = racers[i], slot = document.createElement('span'); slot.className = `slot ${r && !r.isBot ? 'human' : ''}`;
+        slot.textContent = r && !r.isBot ? '●' : 'AI'; slot.title = r ? `${r.name}${r.isBot ? ' · bot' : ''}` : 'Place libre — complétée par un bot'; return slot;
+      }));
+      const humans = racers.filter(r => !r.isBot).length;
+      $('#gridLabel').textContent = `${humans || 1} joueur${humans > 1 ? 's' : ''} · ${6 - (humans || 1)} bots · 3 tours`;
+    },
+  };
+}

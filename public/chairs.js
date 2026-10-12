@@ -1,0 +1,236 @@
+import { RoundedBoxGeometry } from './vendor/RoundedBoxGeometry.js';
+import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
+
+// Authored model parts all use -Z as their forward axis (feet, face and headlights).
+export const silhouettes = {
+  comet: { label: 'Coque profilée · dossier bas', width: 1.05, length: 1.8, back: .85, wheel: .40 },
+  atlas: { label: 'Châssis large · arceau renforcé', width: 1.4, length: 1.7, back: 1.2, wheel: .48 },
+  drift: { label: 'Roues inclinées · châssis ouvert', width: 1.05, length: 1.4, back: .9, wheel: .52 },
+  trail: { label: 'Six roues crantées · garde au sol haute', width: 1.25, length: 1.85, back: 1.1, wheel: .49 },
+  pulse: { label: 'Châssis compact · batteries latérales', width: .98, length: 1.35, back: 1.0, wheel: .38 },
+};
+
+export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767', skin: '#e8b48e', hair: '#96816a', style: 'glasses' }, options = {}) {
+  const spec = silhouettes[chair.id] || silhouettes.comet;
+  const group = new THREE.Group();
+  group.name = chair.id;
+  group.userData.chairId = chair.id;
+  group.userData.pilotId = pilot.id;
+  const paint = new THREE.MeshPhysicalMaterial({ color: chair.color, metalness: .2, roughness: .32, clearcoat: .75, clearcoatRoughness: .24 });
+  const dark = new THREE.MeshStandardMaterial({ color: '#202935', roughness: .8 });
+  const metal = new THREE.MeshStandardMaterial({ color: '#adbbc4', metalness: .65, roughness: .35 });
+  const skin = new THREE.MeshStandardMaterial({ color: pilot.skin, roughness: .76 });
+  const clothes = new THREE.MeshStandardMaterial({ color: pilot.color, roughness: .65 });
+  const hair = new THREE.MeshStandardMaterial({ color: pilot.hair, roughness: .88 });
+  const white = new THREE.MeshStandardMaterial({ color: '#fff9e9', roughness: .65 });
+  const lamp = new THREE.MeshStandardMaterial({ color: '#effbff', emissive: '#acdeff', emissiveIntensity: .5 });
+  const trim = new THREE.MeshStandardMaterial({ color: '#ffdc56', metalness: .4, roughness: .3 });
+  const red = new THREE.MeshStandardMaterial({ color: '#ff5a63', emissive: '#fa233b', emissiveIntensity: .6 });
+  function box(name, size, position, mat = paint) {
+    const mesh = new THREE.Mesh(new RoundedBoxGeometry(...size, 2, Math.min(...size) * .28), mat);
+    mesh.name = name; mesh.position.set(...position); group.add(mesh); return mesh;
+  }
+  function oval(name, size, position, mat) {
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), mat);
+    mesh.name = name; mesh.scale.set(...size); mesh.position.set(...position); group.add(mesh); return mesh;
+  }
+  function limb(name, from, to, radius, mat) {
+    const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to), delta = b.clone().sub(a);
+    const mesh = new THREE.Mesh(new THREE.CapsuleGeometry(radius, Math.max(.001, delta.length() - radius * 2), 4, 10), mat);
+    mesh.name = name; mesh.position.copy(a.add(b).multiplyScalar(.5));
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize()); group.add(mesh); return mesh;
+  }
+  box('chassis', [spec.width, .28, spec.length], [0, .48, 0]);
+  box('seat', [.86, .16, .78], [0, .84, 0], dark);
+  box('backrest', [.86, spec.back, .16], [0, .84 + spec.back / 2, .43], dark);
+  box('back-shell', [.94, spec.back * .85, .10], [0, .84 + spec.back / 2, .54]);
+  box('seat-cushion', [.76, .14, .70], [0, .94, -.02], dark);
+  for (const side of [-1, 1]) {
+    box('sculpted-side', [.15, .30, .98], [side * (spec.width / 2 - .025), .61, -.10]);
+    box('trim-stripe', [.027, .045, .85], [side * (spec.width / 2 + .055), .69, -.1], trim);
+    box('back-padding', [.12, spec.back * .65, .08], [side * .29, .91 + spec.back / 2, .30], dark);
+    box('brake-light', [.23, .075, .035], [side * .30, 1.15, .607], red);
+    limb('suspension-strut', [side * .40, .44, .10], [side * (spec.width / 2 + .08), spec.wheel, .27], .045, metal);
+    for (let i = 0; i < 3; i++) box('cooling-fin', [.028, .14, .34], [side * .30 + i * .067, .55, .64], dark);
+  }
+  box('rear-number-plate', [.30, .15, .035], [0, 1.13, .611], trim);
+  for (let i = 0; i < 3; i++) box('plate-stripe', [.033, .095, .010], [(i - 1) * .065, 1.13, .634], dark);
+  box('footrest', [.8, .10, .5], [0, .37, -.96], metal);
+  for (const side of [-1, 1]) {
+    box('armrest', [.13, .12, .83], [side * .51, 1.15, -.04], dark);
+    box('arm-support', [.07, .4, .07], [side * .51, .94, .23], metal);
+    box('headlight', [.16, .10, .04], [side * .36, .53, -spec.length / 2 - .03], lamp);
+  }
+  const wheelZ = chair.id === 'trail' ? [-.62, 0, .62] : [.27];
+  for (const side of [-1, 1]) for (const z of wheelZ) {
+    const wheel = new THREE.Group();
+    wheel.name = 'drive-wheel'; wheel.position.set(side * (spec.width / 2 + .12), spec.wheel, z);
+    if (chair.id === 'drift') wheel.rotation.z = -side * .18;
+    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(spec.wheel, spec.wheel, .22, 24), dark);
+    tyre.rotation.z = Math.PI / 2; wheel.add(tyre);
+    const shoulder = new THREE.Mesh(new THREE.TorusGeometry(spec.wheel * .81, spec.wheel * .19, 8, 24), dark);
+    shoulder.rotation.y = Math.PI / 2; shoulder.position.x = side * .09; wheel.add(shoulder);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(spec.wheel * .5, spec.wheel * .5, .24, 10), metal);
+    hub.rotation.z = Math.PI / 2; wheel.add(hub);
+    const rim = new THREE.Mesh(new THREE.TorusGeometry(spec.wheel * .69, .028, 6, 24), paint);
+    rim.rotation.y = Math.PI / 2; rim.position.x = side * .126; wheel.add(rim);
+    for (let i = 0; i < 6; i++) {
+      const spoke = new THREE.Mesh(new THREE.BoxGeometry(.035, spec.wheel * 1.05, .037), metal);
+      spoke.position.x = side * .15; spoke.rotation.x = i * Math.PI / 3; wheel.add(spoke);
+    }
+    wheel.userData.radius = spec.wheel;
+    if (chair.id === 'trail') for (let j = 0; j < 10; j++) {
+      const tread = new THREE.Mesh(new THREE.BoxGeometry(.25, .10, .17), dark), angle = j * Math.PI / 5;
+      tread.position.set(0, Math.cos(angle) * spec.wheel, Math.sin(angle) * spec.wheel);
+      tread.rotation.x = angle; wheel.add(tread);
+    }
+    group.add(wheel);
+  }
+  if (chair.id !== 'trail') for (const side of [-1, 1]) {
+    const pivot = new THREE.Group(); pivot.name = 'caster-pivot'; pivot.position.set(side * .45, .18, -.72);
+    const caster = new THREE.Group(); caster.name = 'caster'; caster.userData.radius = .18;
+    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, .13, 16), dark); tyre.rotation.z = Math.PI / 2; caster.add(tyre);
+    const hub = new THREE.Mesh(new THREE.CylinderGeometry(.065, .065, .14, 12), metal); hub.rotation.z = Math.PI / 2; caster.add(hub);
+    pivot.add(caster); group.add(pivot);
+  }
+  if (chair.id === 'comet') {
+    const nose = box('tapered-nose', [.83, .16, .63], [0, .64, -.65]); nose.rotation.x = -.22;
+    box('rear-spoiler', [1.5, .09, .28], [0, .86, .85]);
+  } else if (chair.id === 'atlas') {
+    box('front-bumper', [1.65, .25, .22], [0, .46, -.97], metal);
+    for (const side of [-1, 1]) box('roll-post', [.11, 1.4, .11], [side * .58, 1.25, .7], metal);
+    box('roll-bar', [1.27, .11, .11], [0, 1.95, .7], metal);
+  } else if (chair.id === 'drift') {
+    for (const side of [-1, 1]) box('exposed-rail', [.08, .10, 1.6], [side * .61, .64, -.12], metal);
+    box('rear-brace', [1.4, .1, .12], [0, .6, .64], metal);
+  } else if (chair.id === 'trail') {
+    box('equipment-rack', [1.0, .12, .5], [0, 1.05, .85], metal);
+    box('equipment-case', [.62, .3, .4], [0, 1.26, .85], dark);
+  } else {
+    for (const side of [-1, 1]) {
+      box('battery-pod', [.25, .6, .7], [side * .66, .69, .2]);
+      box('battery-indicator', [.03, .35, .32], [side * .80, .74, .2], lamp);
+    }
+  }
+  // Seated pilot with supported torso, legs, headrest and an accessible controller.
+  oval('torso', [.30, .37, .20], [0, 1.24, .11], clothes);
+  box('jacket-zip', [.026, .48, .022], [0, 1.28, -.089], metal);
+  box('lap-belt', [.58, .07, .34], [0, .97, .06], dark);
+  box('headrest', [.42, .28, .16], [0, 1.85, .4], dark);
+  oval('neck', [.10, .15, .10], [0, 1.57, .09], skin);
+  const head = oval('head', [.255, .30, .235], [0, 1.88, .065], skin);
+  oval('hair-cap', [.261, .17, .239], [0, 2.075, .10], hair);
+  oval('fringe', [.19, .082, .073], [-.045, 2.081, -.106], hair).rotation.z = -.22;
+  oval('face-nose', [.05, .06, .075], [0, 1.87, -.166], skin);
+  oval('smile', [.075, .016, .015], [0, 1.765, -.143], white);
+  for (const side of [-1, 1]) {
+    oval('ear', [.047, .083, .043], [side * .251, 1.89, .055], skin);
+    oval('eye-white', [.061, .047, .023], [side * .105, 1.95, -.146], white);
+    oval('eye-pupil', [.024, .030, .012], [side * .105, 1.95, -.169], dark);
+    oval('eye-glint', [.007, .009, .007], [side * .102 - .005, 1.959, -.179], white);
+    const brow = oval('eyebrow', [.070, .018, .020], [side * .107, 2.013, -.141], hair); brow.rotation.z = side * .12;
+    limb('thigh', [side * .17, .98, .03], [side * .18, .98, -.40], .12, dark);
+    limb('shin', [side * .18, .92, -.42], [side * .18, .50, -.53], .087, dark);
+    oval('shoe', [.115, .085, .22], [side * .18, .43, -.65], dark);
+    limb('sleeve', [side * .24, 1.44, .08], [side * .37, 1.22, .035], .10, clothes);
+    limb('forearm', [side * .37, 1.22, .035], [side * .42, 1.20, -.29], .075, clothes);
+    oval('hand', [.076, .057, .09], [side * .42, 1.20, -.32], skin);
+  }
+  if (pilot.style === 'glasses' || pilot.style === 'bob') {
+    const frame = pilot.style === 'bob' ? new THREE.MeshStandardMaterial({ color: '#753ccb', roughness: .5 }) : dark;
+    for (const side of [-1, 1]) {
+      const glass = new THREE.Mesh(new THREE.TorusGeometry(.076, .012, 5, 16), frame);
+      glass.name = 'glasses'; glass.position.set(side * .106, 1.95, -.176); glass.scale.y = .74; group.add(glass);
+      box('glasses-arm', [.017, .016, .24], [side * .218, 1.951, -.04], frame);
+    }
+    box('glasses-bridge', [.066, .014, .012], [0, 1.96, -.18], frame);
+  }
+  if (pilot.style === 'ponytail') {
+    oval('ponytail', [.14, .28, .13], [0, 1.94, .34], hair).rotation.x = -.45;
+    oval('hair-band', [.105, .075, .075], [0, 2.12, .29], clothes);
+  }
+  if (pilot.style === 'buns') for (const side of [-1, 1]) oval('hair-bun', [.14, .14, .14], [side * .24, 2.12, .09], hair);
+  if (pilot.style === 'beard') oval('beard', [.213, .11, .15], [0, 1.716, .012], hair);
+  if (pilot.style === 'bob') for (const side of [-1, 1]) oval('bob-hair', [.10, .26, .18], [side * .222, 1.96, .12], hair);
+  if (pilot.style === 'spikes') for (let i = 0; i < 5; i++) {
+    const spike = new THREE.Mesh(new THREE.ConeGeometry(.095, .25 + i % 2 * .08, 6), hair);
+    spike.name = 'hair-spike'; spike.position.set((i - 2) * .095, 2.23, .07); spike.rotation.z = (2 - i) * .18; group.add(spike);
+  }
+  if (pilot.style === 'cap') {
+    oval('cap', [.275, .14, .25], [0, 2.09, .075], clothes);
+    oval('cap-visor', [.245, .025, .17], [0, 2.05, -.20], paint);
+  }
+  box('controller', [.16, .08, .23], [.52, 1.25, -.35], dark);
+  limb('joystick', [.52, 1.30, -.37], [.52, 1.40, -.37], .025, metal);
+  const body = new THREE.Group(); body.name = 'suspension-rig';
+  const headRig = new THREE.Group(); headRig.name = 'head-rig'; headRig.position.set(0, 1.65, .08);
+  const headNames = /^(head$|hair|fringe|face|smile|ear|eye|glasses|ponytail|beard|bob|cap)/;
+  const wheels = [], casters = [], eyes = [];
+  // A separate pivot for each eye allows a subtle blink without deforming the face.
+  for (const side of [-1, 1]) {
+    const pivot = new THREE.Group(); pivot.name = 'eye-rig'; pivot.position.set(side * .105, 1.95, -.16);
+    for (const child of [...group.children]) if (['eye-white', 'eye-pupil', 'eye-glint'].includes(child.name) && Math.sign(child.position.x) === side) { child.position.sub(pivot.position); pivot.add(child); }
+    group.add(pivot); eyes.push(pivot);
+  }
+  for (const child of [...group.children]) {
+    if (child.name === 'drive-wheel') wheels.push(child);
+    else if (child.name === 'caster-pivot') { casters.push(child); wheels.push(child.children[0]); }
+    else if (headNames.test(child.name)) { child.position.sub(headRig.position); headRig.add(child); }
+    else body.add(child);
+  }
+  body.add(headRig); group.add(body);
+  group.userData.animation = { body, head: headRig, eyes, wheels, casters, speed: 0, steer: 0, pitch: 0, lean: 0, wheelTravel: 0 };
+  if (options.race) {
+    for (const wheel of wheels) batchStaticMeshes(THREE, wheel);
+    for (const eye of eyes) batchStaticMeshes(THREE, eye);
+    batchStaticMeshes(THREE, headRig); batchStaticMeshes(THREE, body);
+    // Screen-space coverage fade: all surfaces use the SAME pixel mask, avoiding
+    // translucent heads/chassis revealing their internal geometry near the camera.
+    const fade = { value: 1 }, materials = new Set(); group.userData.cameraFadeUniform = fade;
+    group.traverse(o => { if (o.material) materials.add(o.material); });
+    for (const material of materials) {
+      material.onBeforeCompile = shader => {
+        shader.uniforms.uCameraFade = fade;
+        shader.fragmentShader = 'uniform float uCameraFade;\n' + shader.fragmentShader.replace('#include <alphatest_fragment>', '#include <alphatest_fragment>\nfloat coverage = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898,78.233))) * 43758.5453);\nif(coverage > uCameraFade) discard;');
+      };
+      material.customProgramCacheKey = () => 'avatar-camera-coverage-v1';
+    }
+  }
+  return group;
+}
+
+function batchStaticMeshes(THREE, parent) {
+  const buckets = new Map();
+  for (const mesh of [...parent.children]) {
+    if (!mesh.isMesh) continue;
+    mesh.updateMatrix(); const geometry = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+    geometry.applyMatrix4(mesh.matrix);
+    // All authored parts use position, normal and uv; discard any extra channels.
+    for (const name of Object.keys(geometry.attributes)) if (!['position', 'normal', 'uv'].includes(name)) geometry.deleteAttribute(name);
+    if (!buckets.has(mesh.material)) buckets.set(mesh.material, []);
+    buckets.get(mesh.material).push(geometry); mesh.geometry.dispose(); parent.remove(mesh);
+  }
+  for (const [material, geometries] of buckets) {
+    const merged = mergeGeometries(geometries); geometries.forEach(g => g.dispose());
+    const mesh = new THREE.Mesh(merged, material); mesh.name = 'batched-detail'; mesh.castShadow = true; parent.add(mesh);
+  }
+}
+
+export function animateChair(model, pose, dt, now) {
+  const rig = model.userData.animation; if (!rig) return;
+  const step = Math.max(0, Math.min(dt, .05)), easing = 1 - Math.exp(-10 * step);
+  const speed = pose.speed || 0, steer = pose.steer || 0;
+  const acceleration = Math.max(-12, Math.min(12, (speed - rig.speed) / Math.max(step, .001)));
+  rig.speed += (speed - rig.speed) * easing; rig.steer += (steer - rig.steer) * easing;
+  rig.pitch += (-acceleration * .003 - rig.pitch) * easing;
+  rig.lean += (-rig.steer * Math.min(Math.abs(speed) / 18, 1) * .075 - rig.lean) * easing;
+  rig.body.rotation.x = rig.pitch; rig.body.rotation.z = rig.lean;
+  rig.body.position.y = Math.abs(speed) > 2 ? Math.sin(now * .012) * .0035 : 0;
+  rig.head.rotation.y = -rig.steer * .10; rig.head.rotation.z = -rig.lean * .35;
+  const phase = (now * .001 + model.name.length * .7) % 4.8;
+  const blink = phase < .14 ? Math.max(.08, Math.abs(phase - .07) / .07) : 1;
+  for (const eye of rig.eyes) eye.scale.y = blink;
+  rig.wheelTravel = (rig.wheelTravel + speed * step) % 10000;
+  for (const wheel of rig.wheels) wheel.rotation.x = -rig.wheelTravel / wheel.userData.radius;
+  for (const caster of rig.casters) caster.rotation.y = -rig.steer * .4;
+}

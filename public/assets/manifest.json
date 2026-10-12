@@ -1,0 +1,43 @@
+{
+  "generator": "OpenAI imagegen",
+  "purpose": "Local menu art inspired by the two user-supplied references in example visual. Illustrations are art-direction backgrounds, not screenshots of the 3D race.",
+  "references": [
+    "example visual/Sélection du pilote Hawking.png",
+    "example visual/Sélection de circuit Côte Azur.png"
+  ],
+  "files": [
+    {
+      "file": "coast-menu.png",
+      "prompt": "Clean 16:9 environment behind an arcade racing selection menu. Sunny stylized 3D Mediterranean cove, turquoise sea, rounded limestone cliffs, lighthouse on right, terracotta village, lush trees, distant viaduct, balloons and fluffy clouds. Winding asphalt road with red-white curbs foreground. Soft ambient occlusion, polished materials, warm sunlight. Open central foreground for live wheelchair/podium. No UI, text, characters or vehicles.",
+      "reference": "Sélection de circuit Côte Azur.png"
+    },
+    {
+      "file": "pilots.png",
+      "prompt": "Production-ready 4-column 2-row portrait atlas, edge-to-edge equal square tiles, no text or dividers. Polished cartoon 3D electric wheelchair racers against blue sky: row 1 Stephen Hawking with grey-brown hair, glasses and navy jacket; Maya with brown ponytail and pink jacket; Amine with dark skin, beard and green suit; Lina with pink double buns and purple outfit. Row 2 Ren with spiky dark hair and orange jacket; Camille with baseball cap and slate jacket; Sofia with blonde hair, purple glasses and cream outfit; one empty blue sky tile. Friendly confident expressions, sunlight, wheelchair headrests, chest/head crop.",
+      "reference": "Sélection du pilote Hawking.png"
+    },
+    {
+      "file": "neon-menu.png",
+      "prompt": "Wide 16:9 premium vibrant stylized 3D arcade racing environment, futuristic neon city at blue hour, blue purple glass skyscrapers, pink and cyan neon strips, sweeping asphalt road, red-white curbs, luminous yellow chevrons, colorful inviting arcade aesthetic, polished materials. Open foreground for UI. No UI, text, characters, vehicles or logos."
+    },
+    {
+      "file": "metro-menu.png",
+      "prompt": "Wide 16:9 vibrant stylized 3D arcade racing environment, playful abandoned metro station with grand blue-violet arched tunnel, warm amber lamps and teal glow, sweeping asphalt with red-white curbs, yellow chevrons and colored tiles. Polished, mysterious but inviting. Open foreground. No UI, text, characters, vehicles or logos."
+    },
+    {
+      "file": "garden-menu.png",
+      "prompt": "Wide 16:9 vibrant stylized 3D arcade racing environment, sunny lush jungle garden, round trees, winding asphalt road and red-white curbs across mossy stone bridge, turquoise river and waterfall, flowers and ancient arches, fluffy clouds and yellow chevrons. Playful polished materials, soft ambient shadows. Open foreground. No UI, text, characters, vehicles or logos."
+    },
+    {
+      "file": "orbit-menu.png",
+      "prompt": "Wide 16:9 vibrant stylized 3D arcade racing environment, magical sky circuit over floating white limestone islands and fluffy clouds, road with blue-white curbs and yellow chevrons, floating rings, distant planets in blue-violet sky, golden sunbeams, polished rounded architecture. Open foreground. No UI, text, characters, vehicles or logos."
+    }
+  ],
+  "font": {
+    "file": "display.ttf",
+    "family": "Barlow Condensed ExtraBold Italic",
+    "source": "https://github.com/google/fonts/tree/main/ofl/barlowcondensed",
+    "license": "FONT-LICENSE.txt"
+  },
+  "models": "Live procedural 3D models in chairs.js; RoundedBoxGeometry from the installed Three.js distribution, MIT license in ../vendor/THREE-LICENSE.txt."
+}

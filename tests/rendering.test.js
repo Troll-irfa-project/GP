@@ -1,0 +1,55 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawn } from 'node:child_process';
+import { mkdir } from 'node:fs/promises';
+import { chromium } from '@playwright/test';
+
+test('five 3D themes, drift particles, turbo and bounded rendering resources', { timeout: 120000 }, async () => {
+  const port = 8102, url = `http://127.0.0.1:${port}`;
+  const server = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: String(port) }, stdio: 'pipe' });
+  let browser;
+  try {
+    for (let i = 0; i < 100; i++) { try { if ((await fetch(url)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 30)); }
+    browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-swiftshader'] });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } }), errors = [], results = [];
+    page.on('pageerror', e => errors.push(e.message));
+    page.on('console', message => { if (message.type() === 'error' && /THREE|WebGL|shader|GLTF/i.test(message.text())) errors.push(message.text()); });
+    await page.goto(url); await page.locator('.pilot-card').first().waitFor();
+    await page.evaluate(async () => {
+      const THREE = await import('/three.js'); window.renderHistory = [];
+      THREE.Scene.prototype.onAfterRender = function(renderer, scene) {
+        const root = scene.getObjectByName('trackWorld'), player = scene.children.find(o => o.userData.isPlayer);
+        if (!root || !player) return;
+        const particles = scene.getObjectByName('pooled-race-vfx'), sizes = particles.geometry.attributes.size.array;
+        const row = { track: root.userData.trackId, steer: player.userData.pose.steer, lean: player.userData.animation.lean, speed: player.userData.pose.speed, boost: player.userData.pose.boost, drift: player.userData.pose.drift, particles: sizes.filter(v => v > .01).length, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures };
+        window.lastRender = row; window.renderHistory.push(row); if (window.renderHistory.length > 1000) window.renderHistory.shift();
+      };
+    });
+    await mkdir('test-results', { recursive: true });
+    for (const track of ['coast', 'neon', 'metro', 'garden', 'orbit', 'coast']) {
+      if (await page.locator('#backButton').isVisible()) await page.locator('#backButton').click();
+      await page.locator('#circuitStep').click(); await page.locator(`[data-track="${track}"]`).click();
+      await page.evaluate(() => { window.lastRender = null; window.renderHistory = []; });
+      await page.locator('#startButton').click();
+      await page.waitForFunction(id => window.lastRender?.track === id && document.querySelector('#countdown').textContent === '', track);
+      await page.keyboard.down('w'); await page.waitForTimeout(3100); await page.keyboard.up('w');
+      await page.screenshot({ path: `test-results/race-${track}-art.png` });
+      const metrics = await page.evaluate(() => window.lastRender); results.push(metrics);
+      assert.ok(metrics.calls < 240, `${track} draw calls: ${metrics.calls}`);
+      assert.ok(metrics.triangles < 600000, `${track} triangle budget: ${metrics.triangles}`);
+      assert.ok(metrics.geometries < 450, `${track} geometry budget: ${metrics.geometries}`);
+    }
+    const first = results[0], last = results.at(-1);
+    assert.ok(last.textures <= first.textures + 6, 'track replay releases obsolete textures');
+    await page.keyboard.down('w'); await page.keyboard.down('ArrowRight'); await page.keyboard.down('Space');
+    await page.waitForTimeout(490);
+    await page.keyboard.up('Space'); await page.keyboard.up('ArrowRight');
+    await page.waitForFunction(() => window.renderHistory.some(r => r.boost > .05 && r.particles > 0), { timeout: 4000 });
+    await page.screenshot({ path: 'test-results/race-turbo-art.png' }); await page.keyboard.up('w');
+    const animation = await page.evaluate(() => window.renderHistory);
+    assert.ok(animation.some(r => Math.abs(r.lean) > .015), 'body responds to steering');
+    assert.ok(animation.some(r => r.drift > .2 && r.particles > 0), 'charged drift emits sparks');
+    assert.deepEqual(errors, []);
+    console.log(JSON.stringify({ renderingThemes: results }));
+  } finally { await browser?.close(); server.kill(); }
+});

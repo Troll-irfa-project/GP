@@ -1,0 +1,668 @@
+{
+  "schemaVersion": 1,
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "vendor": "Kenney",
+  "modelCount": 16,
+  "coordinateSystem": "glTF right-handed, +Y up; extents are [X width, Y height, Z depth] in original vendor units.",
+  "boundsMethod": "Exact POSITION vertices transformed through the default scene node hierarchy; includes palm leaf rotations/scales and boat paddles. No asset geometry was modified.",
+  "instancingNotes": "Preserve all GLB node transforms. Place root at groundY + groundOffsetY * uniformScale to rest the lowest vertex on ground; Nature Kit roots include a -0.05 Y offset. Nature Kit uses material colors and requires no textures.",
+  "housePaletteVariants": [
+    {
+      "url": "/assets/models/city-kit-suburban/Textures/colormap.png",
+      "description": "Original referenced palette: white walls, green roofs."
+    },
+    {
+      "url": "/assets/models/city-kit-suburban/Textures/variation-a.png",
+      "description": "Vendor palette: peach walls, blue roofs."
+    },
+    {
+      "url": "/assets/models/city-kit-suburban/Textures/variation-b.png",
+      "description": "Vendor palette: terracotta/coral walls, peach orange roofs; recommended for warm coastal styling."
+    },
+    {
+      "url": "/assets/models/city-kit-suburban/Textures/variation-c.png",
+      "description": "Vendor palette: pastel lavender walls, dark roofs."
+    }
+  ],
+  "paletteUsage": "GLBs reference Textures/colormap.png unchanged. To use an alternate vendor palette, replace the loaded material texture at runtime, retaining original UVs and glTF texture settings.",
+  "sources": [
+    {
+      "id": "city-kit-suburban",
+      "pageUrl": "https://kenney.nl/assets/city-kit-suburban",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/city-kit-suburban/2c871b7af2-1745479373/kenney_city-kit-suburban_20.zip",
+      "archiveModelDirectory": "Models/GLB format/",
+      "licenseFile": "/assets/models/city-kit-suburban/License.txt"
+    },
+    {
+      "id": "nature-kit",
+      "pageUrl": "https://kenney.nl/assets/nature-kit",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/nature-kit/37ac38a37b-1677698939/kenney_nature-kit.zip",
+      "archiveModelDirectory": "Models/GLTF format/",
+      "licenseFile": "/assets/models/nature-kit/License.txt"
+    },
+    {
+      "id": "pirate-kit",
+      "pageUrl": "https://kenney.nl/assets/pirate-kit",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/pirate-kit/e6d4bb1525-1771333093/kenney_pirate-kit.zip",
+      "archiveModelDirectory": "Models/GLB format/",
+      "licenseFile": "/assets/models/pirate-kit/License.txt"
+    },
+    {
+      "id": "city-kit-commercial",
+      "pageUrl": "https://kenney.nl/assets/city-kit-commercial",
+      "downloadUrl": "https://kenney.nl/media/pages/assets/city-kit-commercial/a742d900eb-1753115042/kenney_city-kit-commercial_2.1.zip",
+      "archiveModelDirectory": "Models/GLB format/",
+      "licenseFile": "/assets/models/city-kit-commercial/License.txt"
+    }
+  ],
+  "models": [
+    {
+      "id": "building-type-a",
+      "category": "house",
+      "source": "city-kit-suburban",
+      "fileName": "building-type-a.glb",
+      "url": "/assets/models/city-kit-suburban/building-type-a.glb",
+      "archiveEntry": "Models/GLB format/building-type-a.glb",
+      "bytes": 98604,
+      "sha256": "49f32e20b9dcd24b1c8f6d6488807b8c8cb684cbb595bfb0bb36ad903e470faa",
+      "bounds": {
+        "min": [
+          -0.64999998,
+          0,
+          -0.5140689
+        ],
+        "max": [
+          0.64999998,
+          0.83354098,
+          0.5140689
+        ],
+        "extents": [
+          1.29999995,
+          0.83354098,
+          1.0281378
+        ],
+        "center": [
+          0,
+          0.41677049,
+          0
+        ]
+      },
+      "groundOffsetY": 0,
+      "primitives": 1,
+      "positionVertices": 1870,
+      "externalResources": [
+        "/assets/models/city-kit-suburban/Textures/colormap.png"
+      ],
+      "embeddedImages": 0
+    },
+    {
+      "id": "building-type-e",
+      "category": "house",
+      "source": "city-kit-suburban",
+      "fileName": "building-type-e.glb",
+      "url": "/assets/models/city-kit-suburban/building-type-e.glb",
+      "archiveEntry": "Models/GLB format/building-type-e.glb",
+      "bytes": 145512,
+      "sha256": "9ec43994c8c332b1ae5b058d8b9646255831fd91047c1a35b1fc1ecae4c082fc",
+      "bounds": {
+        "min": [
+          -0.64999998,
+          0,
+          -0.514
+        ],
+        "max": [
+          0.64999998,
+          1.13750005,
+          0.514
+        ],
+        "extents": [
+          1.29999995,
+          1.13750005,
+          1.028
+        ],
+        "center": [
+          0,
+          0.56875002,
+          0
+        ]
+      },
+      "groundOffsetY": 0,
+      "primitives": 1,
+      "positionVertices": 2777,
+      "externalResources": [
+        "/assets/models/city-kit-suburban/Textures/colormap.png"
+      ],
+      "embeddedImages": 0
+    },
+    {
+      "id": "building-type-f",
+      "category": "house",
+      "source": "city-kit-suburban",
+      "fileName": "building-type-f.glb",
+      "url": "/assets/models/city-kit-suburban/building-type-f.glb",
+      "archiveEntry": "Models/GLB format/building-type-f.glb",
+      "bytes": 138536,
+      "sha256": "6f778f50d7f03c86f9a018e428cf8ffdd9e918df09954c0651d1c9559584a22b",
+      "bounds": {
+        "min": [
+          -0.71399999,
+          0,
+          -0.70294559
+        ],
+        "max": [
+          0.71400005,
+          1.13750005,
+          0.70294565
+        ],
+        "extents": [
+          1.42800003,
+          1.13750005,
+          1.40589124
+        ],
+        "center": [
+          3e-8,
+          0.56875002,
+          3e-8
+        ]
+      },
+      "groundOffsetY": 0,
+      "primitives": 1,
+      "positionVertices": 2644,
+      "externalResources": [
+        "/assets/models/city-kit-suburban/Textures/colormap.png"
+      ],
+      "embeddedImages": 0
+    },
+    {
+      "id": "flower_redA",
+      "category": "flower",
+      "source": "nature-kit",
+      "fileName": "flower_redA.glb",
+      "url": "/assets/models/nature-kit/flower_redA.glb",
+      "archiveEntry": "Models/GLTF format/flower_redA.glb",
+      "bytes": 7104,
+      "sha256": "171930b7789ddbf735af3745576b5393750beb9133b9ff4a444bb6bb2986c020",
+      "bounds": {
+        "min": [
+          -0.1045345,
+          -0.05,
+          -0.09052953
+        ],
+        "max": [
+          0.05456302,
+          0.24249999,
+          0.09052953
+        ],
+        "extents": [
+          0.15909752,
+          0.29249999,
+          0.18105906
+        ],
+        "center": [
+          -0.02498574,
+          0.09624999,
+          0
+        ]
+      },
+      "groundOffsetY": 0.05,
+      "primitives": 2,
+      "positionVertices": 134,
+      "externalResources": [],
+      "embeddedImages": 0
+    },
+    {
+      "id": "flower_yellowB",
+      "category": "flower",
+      "source": "nature-kit",
+      "fileName": "flower_yellowB.glb",
+      "url": "/assets/models/nature-kit/flower_yellowB.glb",
+      "archiveEntry": "Models/GLTF format/flower_yellowB.glb",
+      "bytes": 11256,
+      "sha256": "aaa8707779a5de59f881f80185bc507b35ec3fd5f23a39d6447ef61141dcd4f5",
+      "bounds": {
+        "min": [
+          -0.1287269,
+          -0.05,
+          -0.11958977
+        ],
+        "max": [
+          0.07860767,
+          0.1085,
+          0.11958977
+        ],
+        "extents": [
+          0.20733457,
+          0.1585,
+          0.23917954
+        ],
+        "center": [
+          -0.02505961,
+          0.02925,
+          0
+        ]
+      },
+      "groundOffsetY": 0.05,
+      "primitives": 2,
+      "positionVertices": 234,
+      "externalResources": [],
+      "embeddedImages": 0
+    },
+    {
+      "id": "grass",
+      "category": "grass",
+      "source": "nature-kit",
+      "fileName": "grass.glb",
+      "url": "/assets/models/nature-kit/grass.glb",
+      "archiveEntry": "Models/GLTF format/grass.glb",
+      "bytes": 11496,
+      "sha256": "260e41d3e5f2472492ed7b475c5b92a30b13ce2bad408535b5ff50574d4575e7",
+      "bounds": {
+        "min": [
+          -0.19883659,
+          -0.05,
+          -0.23933876
+        ],
+        "max": [
+          0.1822374,
+          0.20400001,
+          0.15284404
+        ],
+        "extents": [
+          0.381074,
+          0.25400001,
+          0.3921828
+        ],
+        "center": [
+          -0.0082996,
+          0.077,
+          -0.04324736
+        ]
+      },
+      "groundOffsetY": 0.05,
+      "primitives": 1,
+      "positionVertices": 264,
+      "externalResources": [],
+      "embeddedImages": 0
+    },
+    {
+      "id": "grass_leafs",
+      "category": "grass",
+      "source": "nature-kit",
+      "fileName": "grass_leafs.glb",
+      "url": "/assets/models/nature-kit/grass_leafs.glb",
+      "archiveEntry": "Models/GLTF format/grass_leafs.glb",
+      "bytes": 4608,
+      "sha256": "8bc4c0b17c2e64c34e1acbf7c4a2fd8c04cfcd7155328e61767887b2ced112c7",
+      "bounds": {
+        "min": [
+          -0.12303997,
+          -0.05,
+          -0.13342641
+        ],
+        "max": [
+          0.11144603,
+          0.0925,
+          0.12388184
+        ],
+        "extents": [
+          0.234486,
+          0.1425,
+          0.25730825
+        ],
+        "center": [
+          -0.00579697,
+          0.02125,
+          -0.00477229
+        ]
+      },
+      "groundOffsetY": 0.05,
+      "primitives": 1,
+      "positionVertices": 84,
+      "externalResources": [],
+      "embeddedImages": 0
+    },
+    {
+      "id": "rock_largeA",
+      "category": "rock",
+      "source": "nature-kit",
+      "fileName": "rock_largeA.glb",
+      "url": "/assets/models/nature-kit/rock_largeA.glb",
+      "archiveEntry": "Models/GLTF format/rock_largeA.glb",
+      "bytes": 7552,
+      "sha256": "6dd15390fd96501dcd1454765a17ba61dbbd8d47705dfe5149c8dd92b353ce25",
+      "bounds": {
+        "min": [
+          -0.39245334,
+          -0.05,
+          -0.50773072
+        ],
+        "max": [
+          0.39245334,
+          0.20977597,
+          0.50773072
+        ],
+        "extents": [
+          0.78490669,
+          0.25977597,
+          1.01546144
+        ],
+        "center": [
+          0,
+          0.07988798,
+          0
+        ]
+      },
+      "groundOffsetY": 0.05,
+      "primitives": 2,
+      "positionVertices": 146,
+      "externalResources": [],
+      "embeddedImages": 0
+    },
+    {
+      "id": "rock_largeC",
+      "category": "rock",
+      "source": "nature-kit",
+      "fileName": "rock_largeC.glb",
+      "url": "/assets/models/nature-kit/rock_largeC.glb",
+      "archiveEntry": "Models/GLTF format/rock_largeC.glb",
+      "bytes": 7004,
+      "sha256": "23aee8b727adeaf260207af3e0615dc69aa766c6d87de1d44cbc8c2711d74dd1",
+      "bounds": {
+        "min": [
+          -0.53220493,
+          -0.05,
+          -0.50783104
+        ],
+        "max": [
+          0.53220493,
+          0.27111201,
+          0.50783104
+        ],
+        "extents": [
+          1.06440985,
+          0.32111201,
+          1.01566207
+        ],
+        "center": [
+          0,
+          0.110556,
+          0
+        ]
+      },
+      "groundOffsetY": 0.05,
+      "primitives": 2,
+      "positionVertices": 132,
+      "externalResources": [],
+      "embeddedImages": 0
+    },
+    {
+      "id": "tree_detailed",
+      "category": "tree",
+      "source": "nature-kit",
+      "fileName": "tree_detailed.glb",
+      "url": "/assets/models/nature-kit/tree_detailed.glb",
+      "archiveEntry": "Models/GLTF format/tree_detailed.glb",
+      "bytes": 31412,
+      "sha256": "c041daf2f0fb1d49e4325227cbcd58667adbe51e9b55e8c1f0a94b74cc521b3b",
+      "bounds": {
+        "min": [
+          -0.4324826,
+          -0.05,
+          -0.37213597
+        ],
+        "max": [
+          0.41463244,
+          1.28241701,
+          0.38946652
+        ],
+        "extents": [
+          0.84711504,
+          1.33241701,
+          0.76160249
+        ],
+        "center": [
+          -0.00892508,
+          0.61620851,
+          0.00866528
+        ]
+      },
+      "groundOffsetY": 0.05,
+      "primitives": 3,
+      "positionVertices": 758,
+      "externalResources": [],
+      "embeddedImages": 0
+    },
+    {
+      "id": "tree_palmBend",
+      "category": "tree",
+      "source": "nature-kit",
+      "fileName": "tree_palmBend.glb",
+      "url": "/assets/models/nature-kit/tree_palmBend.glb",
+      "archiveEntry": "Models/GLTF format/tree_palmBend.glb",
+      "bytes": 14820,
+      "sha256": "8af9dae16ce3c03183f9457996ebdd135167199514e8f4f944ee2bd82828d5c9",
+      "bounds": {
+        "min": [
+          -0.46774486,
+          -0.05,
+          -0.50638175
+        ],
+        "max": [
+          0.46774486,
+          1.32991071,
+          0.50638175
+        ],
+        "extents": [
+          0.93548971,
+          1.37991071,
+          1.0127635
+        ],
+        "center": [
+          0,
+          0.63995535,
+          0
+        ]
+      },
+      "groundOffsetY": 0.05,
+      "primitives": 2,
+      "positionVertices": 328,
+      "externalResources": [],
+      "embeddedImages": 0
+    },
+    {
+      "id": "tree_palmDetailedTall",
+      "category": "tree",
+      "source": "nature-kit",
+      "fileName": "tree_palmDetailedTall.glb",
+      "url": "/assets/models/nature-kit/tree_palmDetailedTall.glb",
+      "archiveEntry": "Models/GLTF format/tree_palmDetailedTall.glb",
+      "bytes": 28204,
+      "sha256": "2cbea0f9621cde884c63a7b4ad787bda1d051fa27ef3c66b9f2b65328dc53683",
+      "bounds": {
+        "min": [
+          -0.51716451,
+          -0.05,
+          -0.51459744
+        ],
+        "max": [
+          0.51716455,
+          1.37346697,
+          0.51973161
+        ],
+        "extents": [
+          1.03432906,
+          1.42346697,
+          1.03432906
+        ],
+        "center": [
+          2e-8,
+          0.66173349,
+          0.00256709
+        ]
+      },
+      "groundOffsetY": 0.05,
+      "primitives": 3,
+      "positionVertices": 640,
+      "externalResources": [],
+      "embeddedImages": 0
+    },
+    {
+      "id": "boat-row-small",
+      "category": "boat",
+      "source": "pirate-kit",
+      "fileName": "boat-row-small.glb",
+      "url": "/assets/models/pirate-kit/boat-row-small.glb",
+      "archiveEntry": "Models/GLB format/boat-row-small.glb",
+      "bytes": 17616,
+      "sha256": "846d9b17a73f80e03f7201d3bf0ad1b1bbb49e114b99697740d3426e4f42482d",
+      "bounds": {
+        "min": [
+          -1.37426901,
+          0,
+          -1.18607318
+        ],
+        "max": [
+          1.37426901,
+          0.84769551,
+          1.18607318
+        ],
+        "extents": [
+          2.74853802,
+          0.84769551,
+          2.37214637
+        ],
+        "center": [
+          0,
+          0.42384776,
+          0
+        ]
+      },
+      "groundOffsetY": 0,
+      "primitives": 2,
+      "positionVertices": 292,
+      "externalResources": [
+        "/assets/models/pirate-kit/Textures/colormap.png"
+      ],
+      "embeddedImages": 0
+    },
+    {
+      "id": "building-skyscraper-b",
+      "category": "tower",
+      "source": "city-kit-commercial",
+      "fileName": "building-skyscraper-b.glb",
+      "url": "/assets/models/city-kit-commercial/building-skyscraper-b.glb",
+      "archiveEntry": "Models/GLB format/building-skyscraper-b.glb",
+      "bytes": 138480,
+      "sha256": "3a383e8a0a8819023d30b2aee1c6f40fa6bc28990227a306a86e531f36c6b8d5",
+      "bounds": {
+        "min": [
+          -0.6800006,
+          0,
+          -0.67999995
+        ],
+        "max": [
+          0.67999917,
+          4.48000002,
+          0.68000001
+        ],
+        "extents": [
+          1.35999978,
+          4.48000002,
+          1.35999995
+        ],
+        "center": [
+          -7.2e-7,
+          2.24000001,
+          3e-8
+        ]
+      },
+      "groundOffsetY": 0,
+      "primitives": 1,
+      "positionVertices": 2646,
+      "externalResources": [
+        "/assets/models/city-kit-commercial/Textures/colormap.png"
+      ],
+      "embeddedImages": 0
+    },
+    {
+      "id": "building-skyscraper-d",
+      "category": "tower",
+      "source": "city-kit-commercial",
+      "fileName": "building-skyscraper-d.glb",
+      "url": "/assets/models/city-kit-commercial/building-skyscraper-d.glb",
+      "archiveEntry": "Models/GLB format/building-skyscraper-d.glb",
+      "bytes": 167148,
+      "sha256": "5c524ec13be53fff85ace8b328bc2587cba4e93962230e4a0ba98998e53d30b5",
+      "bounds": {
+        "min": [
+          -0.6400001,
+          0,
+          -0.69394565
+        ],
+        "max": [
+          0.63999969,
+          5.46999931,
+          0.69394571
+        ],
+        "extents": [
+          1.27999979,
+          5.46999931,
+          1.38789135
+        ],
+        "center": [
+          -2.1e-7,
+          2.73499966,
+          3e-8
+        ]
+      },
+      "groundOffsetY": 0,
+      "primitives": 1,
+      "positionVertices": 3206,
+      "externalResources": [
+        "/assets/models/city-kit-commercial/Textures/colormap.png"
+      ],
+      "embeddedImages": 0
+    },
+    {
+      "id": "building-skyscraper-e",
+      "category": "tower",
+      "source": "city-kit-commercial",
+      "fileName": "building-skyscraper-e.glb",
+      "url": "/assets/models/city-kit-commercial/building-skyscraper-e.glb",
+      "archiveEntry": "Models/GLB format/building-skyscraper-e.glb",
+      "bytes": 101880,
+      "sha256": "21b58a2f2b18d6a7cf8915e8b947bdb6a6a0706da6cffb5a01677c29f03b5935",
+      "bounds": {
+        "min": [
+          -0.6474998,
+          0,
+          -0.62100005
+        ],
+        "max": [
+          0.64750004,
+          4.07999992,
+          0.62100017
+        ],
+        "extents": [
+          1.29499984,
+          4.07999992,
+          1.24200022
+        ],
+        "center": [
+          1.2e-7,
+          2.03999996,
+          6e-8
+        ]
+      },
+      "groundOffsetY": 0,
+      "primitives": 1,
+      "positionVertices": 1938,
+      "externalResources": [
+        "/assets/models/city-kit-commercial/Textures/colormap.png"
+      ],
+      "embeddedImages": 0
+    }
+  ],
+  "vendorFilesBytes": 1540688
+}
