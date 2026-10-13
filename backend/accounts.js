@@ -1,3 +1,4 @@
+import { careerProgress } from '../public/competition.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -37,7 +38,13 @@ export class Accounts {
         race_id TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
         track_id TEXT NOT NULL, time_ms INTEGER NOT NULL, place INTEGER NOT NULL, created_at INTEGER NOT NULL,
         PRIMARY KEY(race_id, user_id)
-      ); PRAGMA user_version=1;`);
+      ); CREATE TABLE IF NOT EXISTS tournament_results (
+        tournament_id TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id),
+        difficulty TEXT NOT NULL, mode TEXT NOT NULL, place INTEGER NOT NULL,
+        points INTEGER NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY(tournament_id,user_id)
+      ); CREATE INDEX IF NOT EXISTS record_race_rank ON records(track_id,best_race_ms);
+      CREATE INDEX IF NOT EXISTS record_lap_rank ON records(track_id,best_lap_ms);
+      PRAGMA user_version=2;`);
     this.prune();
   }
   prune() { this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now()); }
@@ -77,7 +84,8 @@ export class Accounts {
     if (!row) return null;
     return { id: row.id, username: row.username, chairId: row.chair_id, pilotId: row.pilot_id,
       favoriteChairIds: JSON.parse(row.favorites), racesFinished: row.races_finished, racesWon: row.races_won,
-      championships: JSON.parse(row.championships),
+      championships: [...JSON.parse(row.championships), ...this.db.prepare('SELECT tournament_id AS id,difficulty,mode,points FROM tournament_results WHERE user_id=? AND place=1 AND points>0').all(id)],
+      career: careerProgress(this.db.prepare("SELECT DISTINCT difficulty FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND mode='career'").all(id).map(r=>r.difficulty)),
       records: this.db.prepare('SELECT track_id AS trackId,best_race_ms AS bestRaceMs,best_lap_ms AS bestLapMs FROM records WHERE user_id=? ORDER BY track_id').all(id) };
   }
   preferences(id, { chairId, pilotId, favoriteChairIds } = {}) {
@@ -111,6 +119,15 @@ export class Accounts {
       }
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+  leaderboard(trackId) {
+    const read = column => this.db.prepare(`SELECT u.username,r.${column} AS timeMs,
+      RANK() OVER (ORDER BY r.${column}) AS rank FROM records r JOIN users u ON u.id=r.user_id
+      WHERE r.track_id=? AND r.${column}>0 ORDER BY r.${column},u.username_key LIMIT 50`).all(trackId);
+    return {trackId, races:read('best_race_ms'), laps:read('best_lap_ms')};
+  }
+  recordTournament({id,userId,difficulty,mode,place,points}) {
+    this.db.prepare('INSERT OR IGNORE INTO tournament_results VALUES(?,?,?,?,?,?,?)').run(id,userId,difficulty,mode,place,points,Date.now());
   }
   close() { this.db.close(); }
 }

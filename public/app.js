@@ -18,7 +18,7 @@ const selection = createSelection(choices => {
   updateFavorite();
   if (currentRoom && state?.lobby.phase === 'waiting') {
     const data = { chairId:choices.chairId, pilotId:choices.pilotId };
-    if (state.lobby.hostId === playerId) data.trackId = choices.trackId;
+    if (state.lobby.hostId === playerId && state.lobby.mode === 'race') data.trackId = choices.trackId;
     send('configure',data);
   }
 });
@@ -67,15 +67,16 @@ function connect() {
     state.lobby.track = state.tracks.find(track => track.id === state.lobby.trackId);
     snapshots.push(state, performance.now());
     if (reset) { cameraReady = false; finishPresentedAt = null; effects?.reset(); }
-    selection.setMultiplayer(state.lobby.trackId,state.lobby.hostId === playerId);
+    selection.setMultiplayer(state.lobby.trackId,state.lobby.hostId === playerId && (!state.lobby.mode || state.lobby.mode === 'race'));
     if (portal.page === 'garage') renderLobby();
     // Lobby DOM is event-driven; physics snapshots should not rebuild 12 cards at 15 Hz.
-    const signature = JSON.stringify([state.lobby.roomId,state.lobby.phase,state.lobby.hostId,state.lobby.trackId,state.racers.map(r=>[r.id,r.name,r.chairId,r.pilotId,r.isBot,r.finished])]);
+    const signature = JSON.stringify([state.lobby.mode,state.lobby.difficulty,state.lobby.cup,state.lobby.roomId,state.lobby.phase,state.lobby.hostId,state.lobby.trackId,state.racers.map(r=>[r.id,r.name,r.chairId,r.pilotId,r.isBot,r.finished])]);
     if (signature !== lobbySignature) {lobbySignature=signature;portal.updateWaiting(state,playerId);}
     const me = state.racers.find(r=>r.id===playerId);
+    if (me?.dnf && state.lobby.phase === 'results' && portal.page === 'race') finish();
     if ((state.lobby.started || state.lobby.countdown) && !me?.finished && portal.page !== 'race') showRace();
     if (state.lobby.phase === 'waiting' && !['waiting','garage'].includes(portal.page)) {stopRace();portal.show('waiting');}
-    if (performance.now() - lastHudUpdate > 100 || state.lobby.countdown) {
+    if (performance.now() - lastHudUpdate > 100 || state.lobby.countdown || state.lobby.phase === 'results') {
       updateRaceUi(); lastHudUpdate = performance.now();
     }
   };
@@ -153,7 +154,7 @@ function resize() {
 }
 async function showRace() {
   portal.show('race');
-  $('#raceTrackName').textContent = state.lobby.track.name.toUpperCase();
+  $('#raceTrackName').textContent = `${state.lobby.track.name.toUpperCase()} · ${state.lobby.difficulty || '100'}cc${state.lobby.cup ? ` · MANCHE ${state.lobby.cup.round}/5` : ''}`;
   $('#raceStatus').textContent = 'À TOI LA PISTE !';
   try { models = await loadModels(); }
   catch (error) { returnToGarage(); $('#menuStatus').textContent = 'Impossible de charger les modèles 3D. Réessaie après rechargement.'; console.error(error); return; }
@@ -218,7 +219,8 @@ function updateRaceUi() {
   }
   $('#raceClock').textContent = new Date(state.lobby.raceTime * 1000).toISOString().slice(14, 19) + '.' + Math.floor(state.lobby.raceTime * 10) % 10;
   if (finishPresentedAt === null) $('#countdown').textContent = state.lobby.countdown || '';
-  $('#ranking').innerHTML = sorted.map((r, i) => `<div class="rank ${r.id === playerId ? 'me' : ''}"><span>${String(i + 1).padStart(2, '0')} &nbsp; ${escapeHtml(r.name)}</span><small>${r.finished ? 'FINI' : `T${r.lap}`}</small></div>`).join('');
+  if (state.lobby.deadline && !me?.finished) $('#raceStatus').textContent = `FIN DANS ${Math.max(0,Math.ceil(state.lobby.deadline-state.lobby.raceTime))} S`;
+  $('#ranking').innerHTML = sorted.map((r, i) => `<div class="rank ${r.id === playerId ? 'me' : ''}"><span>${String(i + 1).padStart(2, '0')} &nbsp; ${escapeHtml(r.name)}</span><small>${r.dnf ? 'ABANDON' : r.finished ? 'FINI' : `T${r.lap}`}</small></div>`).join('');
   $('#raceMapDots').innerHTML = state.racers.map(r => `<circle cx="${r.x}" cy="${r.z}" r="${r.id === playerId ? 4 : 2.5}" fill="${r.id === playerId ? '#ffdf3c' : '#e9f8ff'}" stroke="#0e274b" stroke-width="1.2"/>`).join('');
   if (me?.finished && !result.classList.contains('hidden')) finish();
 }
@@ -226,9 +228,9 @@ function finish() {
   if (result.classList.contains('hidden')) { keys = {}; updateInput(); cancelAnimationFrame(raf); }
   portal.show('result');
   const sorted = [...state.racers].sort(compareRacers), place = sorted.findIndex(r => r.id === playerId);
-  $('#resultTitle').textContent = place === 0 ? 'TU AS GAGNÉ.' : `#${place + 1}, BELLE COURSE.`;
-  $('#resultCopy').textContent = `Victoire de ${sorted[0].name}. ${sorted.some(r => !r.finished) ? 'Les autres pilotes sont encore en piste.' : 'Classement final.'}`;
-  $('#resultRanking').innerHTML = sorted.map((r, i) => `<div class="rank ${r.id === playerId ? 'me' : ''}"><span>${i + 1}. ${escapeHtml(r.name)}</span><small>${r.finished ? `${Math.floor(r.finishTime / 60)}:${(r.finishTime % 60).toFixed(3).padStart(6, '0')}` : 'EN COURSE'}</small></div>`).join('');
+  $('#resultTitle').textContent = sorted[place]?.dnf ? 'TEMPS ÉCOULÉ.' : place === 0 ? 'TU AS GAGNÉ.' : `#${place + 1}, BELLE COURSE.`;
+  $('#resultCopy').textContent = `${sorted[0].dnf ? 'Aucun pilote n’a terminé.' : `Victoire de ${sorted[0].name}.`} ${sorted.some(r => !r.finished) ? 'Les autres pilotes sont encore en piste.' : 'Classement final.'}`;
+  $('#resultRanking').innerHTML = sorted.map((r, i) => `<div class="rank ${r.id === playerId ? 'me' : ''}"><span>${i + 1}. ${escapeHtml(r.name)}</span><small>${r.dnf ? 'ABANDON · 0 PT' : r.finished ? `${Math.floor(r.finishTime / 60)}:${(r.finishTime % 60).toFixed(3).padStart(6, '0')}` : 'EN COURSE'}</small></div>`).join('');
 }
 function updateInput() {
   send('input', { input: {
@@ -283,6 +285,8 @@ portal = createPortal({
   onSignedOut() {const old=socket;socket=null;old?.close();currentRoom=null;playerId=null;stopRace();portal.setOnline(false);},
   onProfile() {updateFavorite();},
   onJoin(roomId) {send('join_room',{roomId,...selection.choices()});},
+  onCareer(difficulty) {send('start_career',{difficulty,...selection.choices()});},
+  onConfigure(data) {send('configure',data);},
   onLeave:leaveRoom,onStart:launchRace,
   onGarage() {selection.setReady(socket?.readyState===1);selection.show('pilot');renderLobby();updateFavorite();},
   getChoices:()=>selection.choices(),

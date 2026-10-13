@@ -14,6 +14,17 @@ try {
   await page.goto(url);
   await page.locator('#roomBrowser').waitFor();
   assert.equal(await page.locator('.room-card').count(),3);
+  await page.locator('[data-career="50"]:enabled').waitFor();
+  assert.equal(await page.locator('[data-career="100"]').isDisabled(),true);
+  await page.locator('#openRecords').click();
+  await page.waitForFunction(()=>document.querySelector('#recordsStatus').textContent.startsWith('Un meilleur temps'));
+  assert.equal(await page.locator('#recordsTrack option').count(),5);
+  await page.locator('#closeRecords').click();
+  await page.locator('[data-career="50"]').click();
+  await page.locator('#roomRoster .room-seat').first().waitFor();
+  assert.equal(await page.locator('#competitionMode').inputValue(),'career');
+  assert.equal(await page.locator('#roomRoster .bot').count(),11);
+  await page.locator('#leaveRoomButton').click();
   await enterGarage(page);
   await page.locator('.pilot-card').first().waitFor();
   await page.evaluate(() => document.fonts.ready);
@@ -47,5 +58,5 @@ try {
   assert.deepEqual(errors, []); assert.deepEqual(failed, []);
   await page.locator('#roomBrowser').waitFor();
   await page.locator('#logoutButton').click();await page.locator('#authScreen').waitFor();
-  console.log('Docker smoke OK: account/session, 3 rooms, 12 racers, local GLB assets, shaders, 3 selection screens, 1440/1024/390px, logout, no browser errors.');
+  console.log('Docker smoke OK: global records, career locks/private room, account/session, 3 rooms, 12 racers, local GLB assets, shaders, 3 selection screens, 1440/1024/390px, logout, no browser errors.');
 } finally { await browser.close(); }

@@ -45,7 +45,7 @@ export function spawnRacer(r, i, course) {
   Object.assign(r, {
     x: p.x, z: p.z, heading: Math.atan2(p.tz, p.tx), speed: 0, steer: 0,
     distance: along, progress: 0, lap: 1, lastAlong: wrap(along, course.total),
-    finished: false, boost: 0, boostCooldown: 0, drift: 0, wasDrifting: false,
+    finished: false, dnf: false, boost: 0, boostCooldown: 0, drift: 0, wasDrifting: false,
     finishTime: null, completedLaps: 0, lapStarted: false, lapStartTime: null, bestLapTime: null, nextCheckpoint: 0, recoveryCount: 0, recoveryFlash: 0,
     ai: { lane, stuck: 0, bestDistance: along, safeAlong: wrap(along, course.total) }
   });
@@ -92,6 +92,8 @@ export function updateLapProgress(r, course, before, dt, laps, raceTime) {
 }
 
 export function compareRacers(a, b) {
+  if (Boolean(a.dnf) !== Boolean(b.dnf)) return a.dnf ? 1 : -1;
+  if (a.dnf && b.dnf) return b.progress-a.progress;
   if (a.finished !== b.finished) return a.finished ? -1 : 1;
   return a.finished ? a.finishTime - b.finishTime : b.progress - a.progress;
 }

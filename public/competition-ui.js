@@ -1,0 +1,60 @@
+import { difficulties, positionPoints } from './competition.js';
+import { tracks } from './catalog.js';
+const esc = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const time = ms => `${Math.floor(ms/60000)}:${(ms/1000%60).toFixed(3).padStart(6,'0')}`;
+export function createCompetitionUI(callbacks, api) {
+  const $ = id => document.getElementById(id);
+  $('roomCards').insertAdjacentHTML('afterend',`<section class="competition-hub"><div class="competition-heading"><div><span class="section-kicker">LE DÉFI SOLO / PROGRESSION SAUVEGARDÉE</span><h2>LA ROUTE DES CHAMPIONS.</h2><p>Remporte un tournoi de cinq courses au cumul des points pour débloquer la catégorie suivante.</p></div><button id="openRecords" class="secondary">CLASSEMENTS MONDIAUX ↗</button></div><div id="careerCards" class="career-cards"></div><p id="careerProgressNotice"></p><p>11 IA · 5 circuits · 3 tours par course. Quitter abandonne le tournoi en cours, mais conserve tes catégories gagnées.</p></section>`);
+  $('roomGarageButton').insertAdjacentHTML('beforebegin',`<div class="competition-options"><label>FORMAT<select id="competitionMode"><option value="race">Course unique</option><option value="tournament">Tournoi · 5 circuits</option><option value="career" disabled>Carrière solo</option></select></label><label>DIFFICULTÉ DES IA<select id="competitionDifficulty">${difficulties.map(d=>`<option value="${d.id}">${d.name} · ${d.label}</option>`).join('')}</select></label><p>La vitesse de ton fauteuil reste identique. Seul le rythme des IA change.</p><p id="cupRoute" class="hidden"></p></div>`);
+  $('roomRoster').insertAdjacentHTML('afterend','<div id="cupStandings" class="cup-standings hidden"></div>');
+  $('resultRanking').insertAdjacentHTML('afterend','<div id="resultCup" class="cup-standings hidden"></div>');
+  $('roomBrowser').insertAdjacentHTML('afterend',`<section id="recordsScreen" class="portal-screen records-screen hidden"><div class="portal-backdrop"></div><div class="portal-heading"><div><span class="section-kicker">LE CLUB / TOUS LES PILOTES</span><h1>LES MEILLEURS <em>CHRONOS.</em></h1><p>Top 50 global · records validés par le serveur · toutes catégories IA confondues.</p></div><button id="closeRecords" class="secondary">← PADDOCK</button></div><div class="records-toolbar"><label>CIRCUIT<select id="recordsTrack">${tracks.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label><button id="refreshRecords" class="secondary">ACTUALISER</button></div><p id="recordsStatus" role="status"></p><div class="records-columns"><section><h2>COURSE / 3 TOURS</h2><ol id="globalRaces"></ol></section><section><h2>MEILLEUR TOUR</h2><ol id="globalLaps"></ol></section></div></section>`);
+  let user, data=[], online=false;
+  function profile(value) {
+    user=value;
+    $('careerProgressNotice').textContent=user?.career?.completed.length===4 ? '★ CARRIÈRE TERMINÉE — Les quatre coupes sont à toi !' : `${user?.career?.completed.length || 0} / 4 coupes remportées`;
+    $('careerCards').innerHTML=difficulties.map(d=>{
+      const won=user?.career?.completed.includes(d.id), unlocked=user?.career?.unlocked.includes(d.id) ?? d.id==='50';
+      return `<article class="career-card ${won?'won':''} ${!unlocked?'locked':''}"><span class="section-kicker">${won?'★ COUPE REMPORTÉE':unlocked?'À CONQUÉRIR':'CATÉGORIE VERROUILLÉE'}</span><h3>${d.name}</h3><p>${d.label}</p><button class="${unlocked?'primary':'secondary'}" data-career="${d.id}" ${!unlocked||!online?'disabled':''}>${won?'REJOUER':unlocked?'RELEVER LE DÉFI':'GAGNE LA COUPE PRÉCÉDENTE'}</button></article>`;
+    }).join('');
+  }
+  $('careerCards').onclick=e=>{const b=e.target.closest('[data-career]');if(b&&!b.disabled)callbacks.onCareer(b.dataset.career);};
+  $('competitionMode').onchange=()=>callbacks.onConfigure({mode:$('competitionMode').value});
+  $('competitionDifficulty').onchange=()=>callbacks.onConfigure({difficulty:$('competitionDifficulty').value});
+  function renderRecords() {
+    const circuit=data.find(c=>c.trackId===$('recordsTrack').value);
+    for(const [id,key]of [['globalRaces','races'],['globalLaps','laps']]) {
+      const rows=circuit?.[key]||[];
+      $(id).innerHTML=rows.length?rows.map(r=>`<li class="record-row ${r.username===user?.username?'self':''}"><b>#${r.rank}</b><span>${esc(r.username)}</span><strong>${time(r.timeMs)}</strong></li>`).join(''):'<li class="record-empty">La piste attend son premier record.</li>';
+    }
+  }
+  async function refresh() {
+    $('refreshRecords').disabled=true;$('recordsStatus').textContent='Chargement des records…';
+    try {data=(await api('/api/leaderboards')).circuits;renderRecords();$('recordsStatus').textContent='Un meilleur temps par pilote et par circuit. Les abandons ne comptent pas.';}
+    catch(error){$('recordsStatus').textContent=error.message;}
+    finally{$('refreshRecords').disabled=false;}
+  }
+  $('openRecords').onclick=()=>{callbacks.onRecords(true);refresh();};
+  $('closeRecords').onclick=()=>callbacks.onRecords(false);
+  $('refreshRecords').onclick=refresh;$('recordsTrack').onchange=renderRecords;
+  function update(state, playerId) {
+    const {lobby}=state;
+    $('competitionMode').value=lobby.mode||'race';$('competitionDifficulty').value=lobby.difficulty||'100';
+    const locked=lobby.hostId!==playerId || lobby.phase!=='waiting' || lobby.mode==='career';
+    $('competitionMode').disabled=locked;$('competitionDifficulty').disabled=locked;
+    $('cupRoute').classList.toggle('hidden',!lobby.mode || lobby.mode==='race');
+    $('cupRoute').textContent='Les cinq manches : '+tracks.map(t=>t.name).join(' → ');
+    const cup=lobby.cup;
+    for(const id of ['cupStandings','resultCup']) {
+      $(id).classList.toggle('hidden',!cup);
+      if(!cup)continue;
+      const next = difficulties[difficulties.findIndex(d=>d.id===lobby.difficulty)+1];
+      const careerNotice = cup.complete && lobby.mode==='career' ? (cup.standings[0].id===playerId && cup.standings[0].points>0 ? (next ? `Catégorie ${next.name} débloquée ! Retrouve-la dans le paddock.` : 'Carrière terminée : les quatre catégories sont remportées !') : 'Coupe non remportée. Réessaie pour débloquer la suite !') : '';
+      $(id).innerHTML=`<span class="section-kicker">${lobby.mode==='career'?'CARRIÈRE':'TOURNOI'} / ${esc(lobby.difficulty)}cc</span><h2>${cup.complete?`VICTOIRE DE ${esc(cup.standings[0].name)}`:`MANCHE ${cup.round} / ${cup.total}`}</h2><p>${careerNotice}</p><p>${cup.complete?'Coupe terminée.':lobby.phase==='results'?'Points attribués. L’hôte peut lancer la manche suivante.':'Classement cumulé des manches terminées.'}</p><ol>${cup.standings.map((e,i)=>`<li class="record-row ${e.id===playerId?'self':''}"><b>${i+1}</b><span>${esc(e.name)}</span><strong>${e.points} pts <small>+${e.lastPoints}</small></strong></li>`).join('')}</ol><p>Fin de course : 60 s après le premier, ou 5 min sans arrivée.</p><p>Barème : ${positionPoints.join(' / ')}. Abandon : 0. Égalité : victoires, puis temps cumulé, puis ordre de grille.</p>`;
+    }
+    if(lobby.hostId===playerId && !locked && lobby.mode!=='race')$('launchRace').textContent='LANCER LE TOURNOI';
+    if(lobby.hostId===playerId && lobby.phase==='waiting' && lobby.mode==='career')$('launchRace').textContent=`LANCER LA COUPE ${lobby.difficulty}cc`;
+    if(lobby.hostId===playerId && lobby.phase==='results' && cup)$('launchRace').textContent=cup.complete?'REJOUER LE TOURNOI':`COURSE SUIVANTE · ${cup.round+1} / 5`;
+  }
+  return {profile,update,setOnline(value){online=value;profile(user);}};
+}

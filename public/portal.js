@@ -1,3 +1,4 @@
+import { createCompetitionUI } from './competition-ui.js';
 import { chairs, tracks, pilots } from './catalog.js';
 
 const $ = selector => document.querySelector(selector);
@@ -11,10 +12,11 @@ export async function api(path, data) {
 
 export function createPortal(callbacks) {
   let user = null, page = 'auth', registering = false, roomState = null, playerId = null, busy = false, online = false;
+  const competition = createCompetitionUI({...callbacks,onRecords:open=>show(open?'records':'rooms')},api);
   function show(next) {
     if(next==='auth' && page!=='auth') authMode(false);
     page = next;
-    for (const [name,id] of Object.entries({auth:'authScreen',rooms:'roomBrowser',waiting:'roomLobby',garage:'lobby',race:'race',result:'result'})) $(`#${id}`).classList.toggle('hidden',name!==next);
+    for (const [name,id] of Object.entries({records:'recordsScreen',auth:'authScreen',rooms:'roomBrowser',waiting:'roomLobby',garage:'lobby',race:'race',result:'result'})) $(`#${id}`).classList.toggle('hidden',name!==next);
     document.body.classList.toggle('in-race',next==='race'); callbacks.onView(next);
   }
   function setUser(value) {
@@ -29,6 +31,7 @@ export function createPortal(callbacks) {
       const format = ms => `${Math.floor(ms/60000)}:${(ms/1000%60).toFixed(3).padStart(6,'0')}`;
       $('#personalRecords').innerHTML = user.records.length ? user.records.map(r=>`<div><strong>${escapeHtml(tracks.find(t=>t.id===r.trackId)?.name || r.trackId)}</strong><span>Course ${format(r.bestRaceMs)}${r.bestLapMs ? ` · Tour ${format(r.bestLapMs)}` : ''}</span></div>`).join('') : '<p>Termine une course pour inscrire ton premier chrono.</p>';
     }
+    competition.profile(user);
     callbacks.onProfile(user);
   }
   function authMode(register) {
@@ -80,19 +83,21 @@ export function createPortal(callbacks) {
     $('#launchRace').disabled=!online||busy||!canLaunch;
     $('#launchRace').textContent=busy?'PRÉPARATION…':lobby.hostId!==id?'EN ATTENTE DE L’HÔTE':lobby.phase==='results'?'LANCER LA REVANCHE':lobby.phase==='waiting'?'LANCER LA COURSE':'COURSE EN COURS';
     $('#roomGarageButton').disabled=lobby.phase!=='waiting'||busy;
-    if(!busy) $('#roomLobbyStatus').textContent=!online?'Connexion au serveur interrompue.':lobby.phase==='waiting'?(canLaunch?'Tu es l’hôte. Attends tes amis, puis lance la course : les bots occupent les places restantes.':`${host?.name || 'L’hôte'} choisit le circuit et lance la course. Tu peux préparer ton fauteuil.`):lobby.phase==='results'?'Course terminée. L’hôte peut lancer la revanche.':me?.finished?'Les autres pilotes terminent leur course. Tu peux rester pour la revanche ou quitter la room.':'La course est en cours.';
+    if(!busy) $('#roomLobbyStatus').textContent=!online?'Connexion au serveur interrompue.':lobby.phase==='waiting'?(canLaunch?'Tu es l’hôte. Attends tes amis, puis lance la course : les bots occupent les places restantes.':`${host?.name || 'L’hôte'} choisit le circuit et lance la course. Tu peux préparer ton fauteuil.`):lobby.phase==='results'?(lobby.cup&&!lobby.cup.complete?'Manche terminée. L’hôte peut lancer le circuit suivant.':'Épreuve terminée. L’hôte peut lancer une revanche.'):me?.finished?'Les autres pilotes terminent leur course. Tu peux rester pour la revanche ou quitter la room.':'La course est en cours.';
+    competition.update(state,id);
+    if(busy) $('#launchRace').textContent='PRÉPARATION…';
     $('#roomRoster').innerHTML=racers.map((r,i)=>`<li class="room-seat ${r.id===id?'self':''} ${r.isBot?'bot':''}"><span class="seat-number">${String(i+1).padStart(2,'0')}</span><div><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(chairs.find(c=>c.id===r.chairId)?.name || '')} · ${escapeHtml(pilots.find(p=>p.id===r.pilotId)?.short || '')}</small></div><span class="seat-role">${r.isBot?'IA':r.id===lobby.hostId?'HÔTE':r.id===id?'TOI':'JOUEUR'}</span></li>`).join('');
   }
   return {
     show,setUser,updateWaiting,get user(){return user;},get page(){return page;},
     setBusy(value,message='') {busy=value;if(roomState)updateWaiting(roomState,playerId);if(message)$('#roomLobbyStatus').textContent=message;},
-    setOnline(value){online=value;if(roomState)updateWaiting(roomState,playerId);for(const button of document.querySelectorAll('[data-room]'))button.disabled=!value||button.dataset.available!=='true';},
-    error(message){const target=page==='auth'?'authStatus':page==='rooms'?'roomBrowserStatus':page==='garage'?'menuStatus':'roomLobbyStatus';$(`#${target}`).textContent=message;},
+    setOnline(value){online=value;competition.setOnline(value);if(roomState)updateWaiting(roomState,playerId);for(const button of document.querySelectorAll('[data-room]'))button.disabled=!value||button.dataset.available!=='true';},
+    error(message){const target=page==='auth'?'authStatus':page==='records'?'recordsStatus':page==='rooms'?'roomBrowserStatus':page==='garage'?'menuStatus':'roomLobbyStatus';$(`#${target}`).textContent=message;},
     authExpired(message){callbacks.onSignedOut();setUser(null);show('auth');$('#authStatus').textContent=message;},
     rooms(list){
       $('#roomCount').textContent=`${list.length} ROOMS DE TEST`;
       $('#roomCards').innerHTML=list.map(room=>{const track=tracks.find(t=>t.id===room.trackId),available=room.phase==='waiting'&&room.humans<room.capacity;
-        return `<article class="room-card"><div class="room-art" style="background-image:url('/assets/${room.trackId}-menu.png')"><span class="room-phase">${room.phase==='waiting'?'OUVERTE':room.phase==='countdown'?'DÉPART IMMINENT':'EN COURSE'}</span><b>${String(room.humans).padStart(2,'0')}<small> / ${room.capacity}</small></b></div><div class="room-card-body"><span class="section-kicker">${escapeHtml(track?.name || '')}</span><h2>${escapeHtml(room.name)}</h2><p>${room.humans} joueur${room.humans>1?'s':''} · ${room.bots} bots<br>Hôte : ${escapeHtml(room.host || 'le premier joueur')}</p><button class="primary" data-room="${room.id}" data-available="${available}" ${!online||!available?'disabled':''}>${available?'REJOINDRE':room.humans>=room.capacity?'COMPLÈTE':'EN COURSE'} <span>❯</span></button></div></article>`;}).join('');
+        return `<article class="room-card"><div class="room-art" style="background-image:url('/assets/${room.trackId}-menu.png')"><span class="room-phase">${room.phase==='waiting'?'OUVERTE':room.phase==='countdown'?'DÉPART IMMINENT':'EN COURSE'}</span><b>${String(room.humans).padStart(2,'0')}<small> / ${room.capacity}</small></b></div><div class="room-card-body"><span class="section-kicker">${escapeHtml(track?.name || '')}</span><h2>${escapeHtml(room.name)}</h2><p>${room.mode==='tournament'?'Tournoi · 5 circuits':'Course unique'} · ${escapeHtml(room.difficulty || '100')}cc<br>${room.humans} joueur${room.humans>1?'s':''} · ${room.bots} bots<br>Hôte : ${escapeHtml(room.host || 'le premier joueur')}</p><button class="primary" data-room="${room.id}" data-available="${available}" ${!online||!available?'disabled':''}>${available?'REJOINDRE':room.humans>=room.capacity?'COMPLÈTE':'EN COURSE'} <span>❯</span></button></div></article>`;}).join('');
     },
     async bootstrap(){
       show('auth');$('#authSubmit').disabled=true;
