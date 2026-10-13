@@ -35,10 +35,10 @@ function stop(r,seconds,spin=false) {
   r.drift=0;r.wasDrifting=false;r.spin=spin?.5:0;
 }
 export function useItem(r,racers,course,world,time) {
-  if(!world?.enabled || r.finished || r.stun>0 || !r.item || r.itemCharges<1 || r.itemCooldown>0)return false;
+  if(!world?.enabled || r.finished || r.pit || r.stun>0 || !r.item || r.itemCharges<1 || r.itemCooldown>0)return false;
   const sorted=[...racers].sort(compareRacers),position=sorted.indexOf(r);
   const target=position>0?sorted[position-1]:null;
-  if(r.item==='revolver' && (!target || target.finished))return false;
+  if(r.item==='revolver' && (!target || target.finished || target.pit))return false;
   if((r.item==='viagra'||r.item==='viagra-box') && r.itemBoost>0)return false;
   const item=raceItems.find(i=>i.id===r.item);if(!item)return false;
   if(r.item==='viagra'||r.item==='viagra-box')r.itemBoost=ITEM_BOOST_SECONDS;
@@ -49,8 +49,8 @@ export function useItem(r,racers,course,world,time) {
     world.traps.push({id:'ladder-'+(++world.serial),owner:r.id,x:p.x-p.tz*lane,z:p.z+p.tx*lane,tx:p.tx,tz:p.tz,halfWidth:course.width*.75,life:30});
     if(world.traps.length>24)world.traps.shift();
   }
-  if(r.item==='lexomil')for(const other of racers)if(other!==r&&!other.finished){other.slow=10;notice(other,'LEXOMIL · VMAX −20 %',time);}
-  if(r.item==='round')sorted.forEach((other,index)=>{if(other!==r&&!other.finished){other.blur=10-5*index/Math.max(1,sorted.length-1);notice(other,'TOURNÉE GÉNÉRALE · VISION TROUBLE',time);}});
+  if(r.item==='lexomil')for(const other of racers)if(other!==r&&!other.finished&&!other.pit){other.slow=10;notice(other,'LEXOMIL · VMAX −20 %',time);}
+  if(r.item==='round')sorted.forEach((other,index)=>{if(other!==r&&!other.finished&&!other.pit){other.blur=10-5*index/Math.max(1,sorted.length-1);notice(other,'TOURNÉE GÉNÉRALE · VISION TROUBLE',time);}});
   if(r.item==='revolver') {
     stop(target,1);r.itemStats.hits++;notice(target,'TOUCHÉ · ARRÊT 1 S',time);
     world.shots.push({id:++world.serial,x:r.x,z:r.z,targetX:target.x,targetZ:target.z,life:.4});
@@ -89,7 +89,7 @@ function sweptBox(before,after,box,halfX,halfZ) {
 }
 export function collectItems(racers,course,world,previous,time,random=Math.random) {
   if(!world?.enabled)return;
-  const active=racers.filter(r=>!r.finished);
+  const active=racers.filter(r=>!r.finished&&!r.pit);
   for(const box of world.boxes) {
     if(box.respawn>0)continue;
     const hits=active.filter(r=>!r.item&&r.pickupCooldown===0&&r.stun===0).map(r=>({r,t:sweptBox(previous.get(r.id)||r,r,box,1.8,1.8)})).filter(h=>h.t!==null).sort((a,b)=>a.t-b.t);

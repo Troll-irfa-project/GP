@@ -9,8 +9,8 @@ export function approachSpeed(speed, target, acceleration, dt) {
   return speed + Math.max(-step, Math.min(step, target - speed));
 }
 
-export function driveSpeed(speed, input, chair, grip, boost, skill, dt, upgrade = null, itemBoost = 0, slow = 0) {
-  const top = topSpeed(chair) * grip * skill * (slow > 0 ? .8 : 1);
+export function driveSpeed(speed, input, chair, grip, boost, skill, dt, upgrade = null, itemBoost = 0, slow = 0, tyres = 1) {
+  const top = topSpeed(chair) * grip * skill * (slow > 0 ? .8 : 1) * tyres;
   const target = input.brake ? -4 : input.gas ? Math.min(top * (boost > 0 ? 1.35 : itemBoost > 0 ? 1.2 : 1), input.speedLimit ?? Infinity) : 0;
   // Equal increments per second: 0 -> Vmax in 3.0–4.6 s for the current garage.
   const secondsToTop = 7 - chair.accel * .4;

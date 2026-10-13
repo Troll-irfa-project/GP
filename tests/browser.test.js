@@ -20,8 +20,8 @@ test('browser: art-directed selection, pilots, smooth motion, camera and replay'
     await page.goto(url);
     await enterGarage(page);
     await page.locator('.pilot-card').first().waitFor();
-    assert.equal(await page.locator('.chair-card').count(), 8);
-    assert.equal(await page.locator('.pilot-card').count(), 9);
+    assert.equal(await page.locator('.chair-card').count(), 10);
+    assert.equal(await page.locator('.pilot-card').count(), 11);
     assert.equal(await page.locator('.track-card').count(), 5);
     await page.evaluate(() => document.fonts.ready);
     await mkdir('test-results', { recursive: true });
@@ -111,7 +111,7 @@ test('browser: art-directed selection, pilots, smooth motion, camera and replay'
     for (const track of catalog.tracks) for (const tree of treePlacements(track.route)) {
       assert.ok(distanceToRoute(tree.x, tree.z, track.route) >= 8.6 + tree.radius + 2);
     }
-    assert.equal(catalog.pilots.length, 9);
+    assert.equal(catalog.pilots.length, 11);
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     mobile.on('pageerror', error => errors.push(error.message));
     await signInPage(mobile,url);

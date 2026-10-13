@@ -43,6 +43,7 @@ export class Economy {
   metrics(id) {
     const user=this.db.prepare('SELECT races_finished AS races,races_won AS wins FROM users WHERE id=?').get(id);
     return {...user,
+      ...this.db.prepare(`SELECT COUNT(*) AS enduranceFinishes,SUM(CASE WHEN place=1 THEN 1 ELSE 0 END) AS enduranceWins,SUM(CASE WHEN place=1 AND items_enabled=1 THEN 1 ELSE 0 END) AS enduranceItemWins,SUM(CASE WHEN place=1 AND items_enabled=0 THEN 1 ELSE 0 END) AS endurancePureWins,COUNT(DISTINCT CASE WHEN place=1 THEN track_id END) AS enduranceCircuits,SUM(CASE WHEN place=1 AND difficulty='200' THEN 1 ELSE 0 END) AS enduranceEliteWins,COALESCE(SUM(perfect_stops),0) AS perfectPitStops FROM race_results WHERE user_id=? AND race_mode='endurance'`).get(id),
       ...Object.fromEntries([['itemWins',1],['pureWins',0]].map(([key,enabled])=>[key,this.db.prepare('SELECT COUNT(*) AS n FROM race_results WHERE user_id=? AND place=1 AND items_enabled=? AND balance_version>=3').get(id,enabled).n])),
       ...Object.fromEntries([['itemCups',1],['pureCups',0]].map(([key,enabled])=>[key,this.db.prepare('SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND items_enabled=? AND balance_version>=3').get(id,enabled).n])),
       ...this.db.prepare('SELECT COALESCE(SUM(item_boxes),0) AS itemBoxes,COALESCE(SUM(item_uses),0) AS itemUses,COALESCE(SUM(item_hits),0) AS itemHits FROM race_results WHERE user_id=? AND items_enabled=1').get(id),

@@ -128,14 +128,16 @@ export function createSelection(onChange) {
     setReady(value) { ready = value; $('#continueButton').disabled = !value; $('#startButton').disabled = !value; },
     update(state) {
       if (!populated) render();
-      const racers = state?.racers || [], signature = JSON.stringify(racers.map(r => [r.id, r.name, r.isBot]));
+      const racers = state?.racers || [], signature = JSON.stringify([state?.lobby?.laps,racers.map(r => [r.id, r.name, r.isBot])]);
       if (signature === rosterSignature) return; rosterSignature = signature;
       $('#slots').replaceChildren(...Array.from({ length: MAX_RACERS }, (_, i) => {
         const r = racers[i], slot = document.createElement('span'); slot.className = `slot ${r && !r.isBot ? 'human' : ''}`;
         slot.textContent = r && !r.isBot ? '●' : 'AI'; slot.title = r ? `${r.name}${r.isBot ? ' · bot' : ''}` : 'Place libre — complétée par un bot'; return slot;
       }));
       const humans = racers.filter(r => !r.isBot).length;
-      $('#gridLabel').textContent = `${humans} joueur${humans > 1 ? 's' : ''} · ${MAX_RACERS - humans} bots · 3 tours`;
+      $('#gridLabel').textContent = `${humans} joueur${humans > 1 ? 's' : ''} · ${MAX_RACERS - humans} bots · ${state?.lobby?.laps||3} tours`;
+      for(const el of document.querySelectorAll('.track-card small'))el.textContent=`${state?.lobby?.laps||3} TOURS · 12 PILOTES`;
+      document.querySelector('.route-preview small').textContent=`${state?.lobby?.laps||3} TOURS POUR FAIRE LA DIFFÉRENCE`;
     },
   };
 }

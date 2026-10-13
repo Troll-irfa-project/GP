@@ -59,6 +59,9 @@ export class Accounts {
     }
     for(const column of ['item_boxes','item_uses','item_hits'])if(!this.db.prepare('PRAGMA table_info(race_results)').all().some(c=>c.name===column))this.db.exec('ALTER TABLE race_results ADD COLUMN '+column+' INTEGER NOT NULL DEFAULT 0');
     this.db.exec('CREATE TABLE IF NOT EXISTS records_with_items(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,track_id TEXT NOT NULL,best_race_ms INTEGER NOT NULL,best_lap_ms INTEGER,PRIMARY KEY(user_id,track_id))');
+    const enduranceColumns=this.db.prepare('PRAGMA table_info(race_results)').all().map(c=>c.name);
+    for(const [column,definition] of [['race_mode',"TEXT NOT NULL DEFAULT 'race'"],['pit_stops','INTEGER NOT NULL DEFAULT 0'],['perfect_stops','INTEGER NOT NULL DEFAULT 0']])if(!enduranceColumns.includes(column))this.db.exec('ALTER TABLE race_results ADD COLUMN '+column+' '+definition);
+    this.db.exec('CREATE TABLE IF NOT EXISTS endurance_records(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,track_id TEXT NOT NULL,items_enabled INTEGER NOT NULL,best_race_ms INTEGER NOT NULL,best_lap_ms INTEGER,PRIMARY KEY(user_id,track_id,items_enabled)); CREATE INDEX IF NOT EXISTS endurance_rank ON endurance_records(track_id,items_enabled,best_race_ms);');
     this.economy = new Economy(this.db);
     this.economy.migrateBalance();
     this.prune();
@@ -103,7 +106,7 @@ export class Accounts {
       favoriteChairIds: JSON.parse(row.favorites), racesFinished: row.races_finished, racesWon: row.races_won,
       championships: [...JSON.parse(row.championships), ...this.db.prepare('SELECT tournament_id AS id,difficulty,mode,points FROM tournament_results WHERE user_id=? AND place=1 AND points>0').all(id)],
       career: careerProgress(this.db.prepare("SELECT DISTINCT difficulty FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND mode='career'").all(id).map(r=>r.difficulty)),
-      records: this.db.prepare('SELECT track_id AS trackId,best_race_ms AS bestRaceMs,best_lap_ms AS bestLapMs,0 AS itemsEnabled FROM records WHERE user_id=? UNION ALL SELECT track_id,best_race_ms,best_lap_ms,1 FROM records_with_items WHERE user_id=? ORDER BY trackId').all(id,id) };
+      records: this.db.prepare('SELECT track_id AS trackId,best_race_ms AS bestRaceMs,best_lap_ms AS bestLapMs,0 AS itemsEnabled,\'race\' AS mode FROM records WHERE user_id=? UNION ALL SELECT track_id,best_race_ms,best_lap_ms,1,\'race\' FROM records_with_items WHERE user_id=? UNION ALL SELECT track_id,best_race_ms,best_lap_ms,items_enabled,\'endurance\' FROM endurance_records WHERE user_id=? ORDER BY trackId').all(id,id,id) };
   }
   preferences(id, { chairId, pilotId, favoriteChairIds } = {}) {
     const profile = this.profile(id);
@@ -122,31 +125,32 @@ export class Accounts {
   }
   sessionValid(hash) { return Boolean(this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND expires_at>?').get(hash, Date.now())); }
   revoke(token) { if (token) this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(token)); }
-  recordResult({ raceId, userId, trackId, time, bestLap, place, difficulty = '100', itemsEnabled = false, itemStats = {} }) {
+  recordResult({ raceId, userId, trackId, time, bestLap, place, difficulty = '100', itemsEnabled = false, itemStats = {}, mode = 'race', pitStops = 0, perfectStops = 0 }) {
     const timeMs = Math.round(time * 1000), lapMs = Number.isFinite(bestLap) ? Math.round(bestLap * 1000) : null;
     if (!Number.isFinite(timeMs) || timeMs <= 0 || !Number.isInteger(place) || place<1 || place>12) return;
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const inserted = this.db.prepare('INSERT OR IGNORE INTO race_results(race_id,user_id,track_id,time_ms,place,created_at,difficulty,balance_version,items_enabled,item_boxes,item_uses,item_hits) VALUES(?,?,?,?,?,?,?,3,?,?,?,?)').run(raceId, userId, trackId, timeMs, place, Date.now(),difficulty,itemsEnabled?1:0,...['boxes','uses','hits'].map(k=>itemsEnabled?Math.max(0,Math.floor(itemStats[k]||0)):0));
+      const inserted = this.db.prepare('INSERT OR IGNORE INTO race_results(race_id,user_id,track_id,time_ms,place,created_at,difficulty,balance_version,items_enabled,item_boxes,item_uses,item_hits,race_mode,pit_stops,perfect_stops) VALUES(?,?,?,?,?,?,?,3,?,?,?,?,?,?,?)').run(raceId, userId, trackId, timeMs, place, Date.now(),difficulty,itemsEnabled?1:0,...['boxes','uses','hits'].map(k=>itemsEnabled?Math.max(0,Math.floor(itemStats[k]||0)):0),mode,mode==='endurance'?pitStops:0,mode==='endurance'?perfectStops:0);
       if (inserted.changes) {
         this.db.prepare('UPDATE users SET races_finished=races_finished+1,races_won=races_won+? WHERE id=?').run(place === 1 ? 1 : 0, userId);
-        this.db.prepare(`INSERT INTO ${itemsEnabled?'records_with_items':'records'} VALUES(?,?,?,?) ON CONFLICT(user_id,track_id) DO UPDATE SET
+        if(mode==='endurance')this.db.prepare(`INSERT INTO endurance_records VALUES(?,?,?,?,?) ON CONFLICT(user_id,track_id,items_enabled) DO UPDATE SET best_race_ms=MIN(best_race_ms,excluded.best_race_ms),best_lap_ms=CASE WHEN best_lap_ms IS NULL THEN excluded.best_lap_ms WHEN excluded.best_lap_ms IS NULL THEN best_lap_ms ELSE MIN(best_lap_ms,excluded.best_lap_ms) END`).run(userId,trackId,itemsEnabled?1:0,timeMs,lapMs);
+        else this.db.prepare(`INSERT INTO ${itemsEnabled?'records_with_items':'records'} VALUES(?,?,?,?) ON CONFLICT(user_id,track_id) DO UPDATE SET
           best_race_ms=MIN(best_race_ms,excluded.best_race_ms),
           best_lap_ms=CASE WHEN best_lap_ms IS NULL THEN excluded.best_lap_ms WHEN excluded.best_lap_ms IS NULL THEN best_lap_ms ELSE MIN(best_lap_ms,excluded.best_lap_ms) END`).run(userId, trackId, timeMs, lapMs);
       }
       if (inserted.changes) {
-        this.economy.grant(userId,'race:'+raceId,'Course terminée · #'+place,raceReward(place,difficulty));
+        this.economy.grant(userId,'race:'+raceId,'Course terminée · #'+place,raceReward(place,difficulty,mode));
         this.economy.checkAchievements(userId);
       }
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
   }
-  leaderboard(trackId,itemsEnabled=false) {
-    const table=itemsEnabled?'records_with_items':'records';
+  leaderboard(trackId,itemsEnabled=false,mode='race') {
+    const table=mode==='endurance'?'endurance_records':itemsEnabled?'records_with_items':'records';
     const read = column => this.db.prepare(`SELECT u.username,r.${column} AS timeMs,
       RANK() OVER (ORDER BY r.${column}) AS rank FROM ${table} r JOIN users u ON u.id=r.user_id
-      WHERE r.track_id=? AND r.${column}>0 ORDER BY r.${column},u.username_key LIMIT 50`).all(trackId);
-    return {trackId, itemsEnabled, races:read('best_race_ms'), laps:read('best_lap_ms')};
+      WHERE r.track_id=? ${mode==='endurance'?`AND r.items_enabled=${itemsEnabled?1:0}`:''} AND r.${column}>0 ORDER BY r.${column},u.username_key LIMIT 50`).all(trackId);
+    return {trackId, itemsEnabled, mode, races:read('best_race_ms'), laps:read('best_lap_ms')};
   }
   recordTournament({id,userId,difficulty,mode,place,points,wonRaces=0,itemsEnabled=false}) {
     this.economy.transaction(()=>{

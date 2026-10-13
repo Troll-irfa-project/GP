@@ -1,3 +1,4 @@
+import { tyreFactor, pitZone } from './endurance.js';
 import { angleDelta, driveSpeed, steeringRate, topSpeed } from './motion.js';
 import { difficulties } from './competition.js';
 import { gridSlot } from './game-config.js';
@@ -65,7 +66,7 @@ export function gateCrossing(gate, before, after) {
 }
 
 export function updateLapProgress(r, course, before, dt, laps, raceTime) {
-  if (r.finished) return;
+  if (r.finished || r.pit) return;
   // Exclude respawns/teleports; collision displacement is included in normal steps.
   const moved = Math.hypot(r.x - before.x, r.z - before.z);
   const crossing = moved <= Math.max(5, Math.abs(r.speed) * dt * 3) ? gateCrossing(course.gates[r.nextCheckpoint], before, r) : null;
@@ -77,7 +78,7 @@ export function updateLapProgress(r, course, before, dt, laps, raceTime) {
         if (lapTime > 0) r.bestLapTime = Math.min(r.bestLapTime ?? Infinity, lapTime);
       }
       r.lapStartTime = crossingTime;
-      if (r.lapStarted) r.completedLaps++;
+      if (r.lapStarted) {r.completedLaps++;if(r.endurance)r.tyreAge++;}
       else r.lapStarted = true; // Crossing from the grid starts, but never awards, lap 1.
       if (r.completedLaps >= laps) {
         r.finished = true; r.finishTime = raceTime - dt + crossing.fraction * dt;
@@ -119,6 +120,7 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
     const obstacleLateral = (blocker.x - n.x) * -n.tz + (blocker.z - n.z) * n.tx;
     lane = obstacleLateral >= ownLateral ? -2.8 : 2.8;
   }
+  if(r.endurance&&r.pitRequested){const pit=pitZone(course),ahead=pathDelta(course,n.along,pit.along);if(ahead>-8&&ahead<45)lane=pit.lane;}
   r.ai.targetLane = (r.ai.targetLane ?? lane) + (lane - (r.ai.targetLane ?? lane)) * Math.min(1, dt * 4);
   const p = pointAt(course, n.along + (errorFromRoad > course.width ? 3 : lookahead), r.ai.targetLane);
   const dx = p.x - r.x, dz = p.z - r.z;
@@ -126,7 +128,7 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
   const distance = Math.max(1, Math.hypot(dx, dz));
   const angularSpeed = 2 * Math.max(4, r.speed) * Math.sin(error) / distance;
   let steer = Math.abs(error) > 1.1 ? Math.sign(error) : clamp(angularSpeed / steeringRate(chair, r.speed), -1, 1);
-  let speedLimit = topSpeed(chair) * (r.skill || 1) * (r.boost>0 ? 1.35 : r.itemBoost>0 ? 1.2 : 1) * (r.slow>0 ? .8 : 1);
+  let speedLimit = topSpeed(chair) * (r.skill || 1) * (r.boost>0 ? 1.35 : r.itemBoost>0 ? 1.2 : 1) * (r.slow>0 ? .8 : 1) * tyreFactor(r);
   // Brake BEFORE a vertex, using the available deceleration and turn radius.
   for (let i = 0; i < course.segments.length; i++) {
     const s = course.segments[i], next = course.segments[(i + 1) % course.segments.length];
@@ -174,12 +176,12 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0, aft
   const previous = new Map(racers.map(r => [r.id, { x: r.x, z: r.z }]));
   for (const r of racers) {
     if (r.finished) continue;
-    if(r.stun>0){r.speed=0;r.boost=0;r.itemBoost=0;continue;}
+    if(r.stun>0||r.pit){r.speed=0;r.boost=0;r.itemBoost=0;continue;}
     const chair = chairs.find(c => c.id === r.chairId);
     const n = nearest(course, r.x, r.z, r.isBot ? r.lastAlong : null);
     const input = r.isBot ? botInput(r, chair, course, n, racers, dt) : r.input || {};
     const grip = n.distance <= course.width ? 1 : Math.min(1,Math.max(.35, chair.offroad / 10) * (r.upgradeId === 'module-grip' ? 1.02 : 1));
-    r.speed = driveSpeed(r.speed, input, chair, grip, r.boost, r.isBot ? r.skill || 1 : 1, dt, r.upgradeId, r.itemBoost, r.slow);
+    r.speed = driveSpeed(r.speed, input, chair, grip, r.boost, r.isBot ? r.skill || 1 : 1, dt, r.upgradeId, r.itemBoost, r.slow, tyreFactor(r));
     const steer = input.steer ?? ((input.right ? 1 : 0) - (input.left ? 1 : 0));
     r.steer += (clamp(steer, -1, 1) - r.steer) * Math.min(1, dt * 12);
     const drifting = Boolean(input.drift && Math.abs(r.steer) > .15 && r.speed > 9 && grip === 1);
@@ -215,7 +217,7 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0, aft
   }
   for (let i = 0; i < racers.length; i++) for (let j = i + 1; j < racers.length; j++) {
     const a = racers[i], b = racers[j];
-    if (a.finished || b.finished) continue;
+    if (a.finished || b.finished || a.pit || b.pit) continue;
     const dx = b.x - a.x, dz = b.z - a.z, distance = Math.hypot(dx, dz);
     if (distance >= 2.1) continue;
     const nx = distance > .001 ? dx / distance : 1, nz = distance > .001 ? dz / distance : 0;
@@ -231,7 +233,7 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0, aft
       b.speed += closing * aw / total * (Math.cos(b.heading) * nx + Math.sin(b.heading) * nz);
     }
   }
-  for(const r of racers)if(r.stun>0){Object.assign(r,previous.get(r.id));r.speed=0;}
+  for(const r of racers)if(r.stun>0||r.pit){Object.assign(r,previous.get(r.id));r.speed=0;}
   afterMove?.(previous);
   for (const r of racers) updateLapProgress(r, course, previous.get(r.id), dt, laps, raceTime);
 }

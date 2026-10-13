@@ -52,7 +52,7 @@ function requireSession(req) {
   return session;
 }
 async function api(req,res,path) {
-  if(req.method==='GET' && path==='/api/leaderboards') return json(res,200,{circuits:tracks.map(t=>accounts.leaderboard(t.id)),withItems:tracks.map(t=>accounts.leaderboard(t.id,true))});
+  if(req.method==='GET' && path==='/api/leaderboards') return json(res,200,{circuits:tracks.map(t=>accounts.leaderboard(t.id)),withItems:tracks.map(t=>accounts.leaderboard(t.id,true)),endurance:tracks.map(t=>accounts.leaderboard(t.id,false,'endurance')),enduranceWithItems:tracks.map(t=>accounts.leaderboard(t.id,true,'endurance'))});
   if(req.method==='GET' && path==='/api/me') return json(res,200,{user:accounts.session(readSessionCookie(req))?.user || null});
   if(req.method==='GET' && path==='/api/rooms') {requireSession(req);return json(res,200,{rooms:rooms.list()});}
   if(req.method!=='POST') throw new HttpError(405,'Méthode non autorisée.');

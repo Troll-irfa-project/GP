@@ -1,6 +1,6 @@
 # Roll Rush
 
-Jeu de course 3D multijoueur : 12 concurrents, cinq circuits, huit fauteuils et neuf personnages, comptes persistants.
+Jeu de course 3D multijoueur : 12 concurrents, cinq circuits, dix fauteuils et onze personnages, comptes persistants.
 
 ## Lancement
 
@@ -29,8 +29,8 @@ Le bouton **Boutique & succès** du paddock ouvre la collection. Les crédits **
 - Tournoi terminé avec au moins un point : bonus de `50 + (12-p) × 8` Rush (+30 pour le vainqueur) et `300 + (12-p) × 35` XP. Ce bonus s’ajoute aux récompenses de chaque manche.
 - Multiplicateurs IA : 50cc ×1, 100cc ×1,15, 150cc ×1,35, 200cc ×1,6. Arrondi à l’entier. Les abandons ne donnent pas de récompense de course.
 - Le niveau `n` commence à `250 × (n-1) × n / 2` XP cumulés : niveau 2 à 250 XP, niveau 3 à 750 XP, etc.
-- Vingt succès donnent automatiquement un bonus unique de Rush et d’XP. Certains ouvrent aussi l’accès à l’achat d’articles exclusifs ; le niveau et le prix restent requis.
-- Quinze articles : trois livrées, trois modules, trois pilotes (Aurore, Idris, Stephen Hawking), trois fauteuils (Vector, Nomad, Apex F1), trois titres publics.
+- Vingt-sept succès donnent automatiquement un bonus unique de Rush et d’XP. Certains ouvrent aussi l’accès à l’achat d’articles exclusifs ; le niveau et le prix restent requis.
+- Vingt et un articles : trois livrées, trois modules, cinq pilotes (Aurore, Idris, Stephen Hawking, Nora, Sacha), cinq fauteuils (Vector, Nomad, Apex F1, Stint GT, Relay R), cinq titres publics.
 - Les cinq fauteuils et six personnages de départ restent disponibles sans achat. Maya est le pilote par défaut ; Stephen Hawking est désormais verrouillé. Tous les fauteuils ont 35 points de statistiques. Les personnages, titres et livrées sont purement visuels.
 - Un seul module actif : accélération +2 %, adhérence hors-piste +2 % (plafonnée à l’adhérence sur route), ou braquage +1,5 %. Aucun module n’augmente la vitesse maximale sur route. Le module équipé s’applique à tous les fauteuils et reste figé durant l’épreuve.
 
@@ -46,6 +46,42 @@ Les récompenses de course en Rush sont réduites de 58 à 75 % selon la positio
 - **Stephen Hawking** : 25 000 Rush, niveau 25, succès « Maître de l’espace-temps ». Il faut 50 victoires de course en 200cc, 10 tournois gagnés en 200cc, une victoire sur chacun des cinq circuits en 200cc, 3 grands chelems (les cinq manches gagnées dans un tournoi 150/200cc), et les quatre catégories de carrière remportées. Les objectifs de course/tournoi prestigieux ne prennent en compte que les nouvelles IA ; les catégories de carrière déjà validées sont conservées.
 
 Les prix, niveaux, conditions et progressions détaillées sont visibles dans Boutique & succès. Les achats, crédits, XP, records et succès déjà acquis ne sont pas retirés. Seul Hawking, auparavant gratuit, devient un déblocage à gagner : les comptes qui l’avaient sélectionné basculent sur Maya. Les anciennes victoires ne sont pas requalifiées en performances contre les nouvelles IA ; la difficulté et la version d’équilibrage sont maintenant enregistrées avec chaque résultat.
+
+## Endurance — 15 tours
+
+Dans le salon, l’hôte choisit **Endurance · 15 tours**, son circuit, la difficulté des IA et **avec ou sans objets**. Ce format est une course unique, distincte des tournois et de la carrière de 3 tours. Les douze participants, humains et bots, utilisent les mêmes règles d’usure. Le relais IA d’un joueur déconnecté conserve l’état de ses pneus et peut terminer un arrêt en cours.
+
+À chaque **tour réellement terminé**, le train de pneus actuel vieillit d’un tour. Le premier passage depuis la grille ne compte pas. Pour un âge `n`, la perte totale de Vmax est `n × (n+1) / 2 %` : 1 %, 3 %, 6 %, 10 %, 15 %, 21 %… Elle est plafonnée à **80 %** pour toujours pouvoir rejoindre les stands. Ce multiplicateur s’applique aussi aux turbos et au ralentissement du Lexomil ; accélération, maniabilité et poids restent inchangés. Aucun fauteuil premium ne réduit l’usure.
+
+### Arrêt aux stands
+
+1. Appuyer sur **E** (ou cliquer sur le bouton pneus) pour préparer l’arrêt. E annule la demande tant qu’on n’est pas immobilisé.
+2. Rejoindre la **bande cyan à droite, juste après la ligne de départ**, signalée PIT / E sur chaque circuit. La demande ne téléporte pas : il faut réellement entrer dans la zone.
+3. Le fauteuil s’arrête automatiquement à 0. Reproduire la séquence de **flèches directionnelles** au clavier ou avec les boutons du QTE. Il y a exactement autant de touches que de tours parcourus avec ce train de pneus, même au plafond d’usure.
+4. Une mauvaise flèche recommence la séquence ; une courte pénalité de 0,4 s empêche le spam. Les validations sont espacées d’au moins 0,15 s et le service prend au minimum 1,2 s. Le serveur contrôle le stop, l’index et la séquence.
+5. Une fois le service fini, pneus neufs, usure remise à zéro et reprise de l’accélération depuis 0 km/h. Un arrêt sans erreur compte comme parfait.
+
+Pendant le service, le fauteuil ne peut ni utiliser/ramasser des objets ni subir de nouveaux impacts ; les collisions entre fauteuils ne bloquent pas les stands. Les effets déjà reçus expirent normalement. L’IA rejoint physiquement la même zone tous les 4 à 6 tours et consacre 0,5 s à chaque étape du service. Aucun checkpoint ni distance de course n’est offert par un arrêt.
+
+L’endurance dispose de **30 minutes maximum**, avec **180 s après la première arrivée** pour les concurrents encore en piste. Les limites sprint restent à 5 minutes / 60 s. Un abandon ne rapporte ni record, ni XP/Rush de course, ni progression de succès liés aux arrêts.
+
+### Récompenses et records d’endurance
+
+Une endurance terminée rapporte **4 fois les Rush et l’XP d’une course classique**, à difficulté et position identiques. Elle compte comme une seule course pour les compteurs existants. Sept nouveaux succès donnent leurs bonus une seule fois et ouvrent les achats suivants (niveau et Rush toujours requis) :
+
+| Objectif | Déblocage | Niveau / prix |
+| --- | --- | --- |
+| Terminer 1 endurance | Titre Longue distance | 4 / 800 Rush |
+| Terminer 10 endurances | Pilote Nora Flux | 10 / 4 000 Rush |
+| Gagner 5 endurances | Fauteuil Stint GT : 8 / 7 / 7 / 7 / 6 | 12 / 6 000 Rush |
+| Gagner 3 endurances sans objets | Titre Horloger des stands | 12 / 3 000 Rush |
+| Gagner 3 endurances avec objets | Pilote Sacha Volt | 14 / 6 500 Rush |
+| 10 arrêts parfaits dans des endurances terminées | Fauteuil Relay R : 7 / 8 / 8 / 6 / 6 | 14 / 6 500 Rush |
+| Gagner les 5 circuits + 5 victoires endurance 200cc | Succès Maître du relais : 500 Rush / 1 500 XP | — |
+
+Les pilotes sont cosmétiques et les nouveaux fauteuils ont chacun 35 points. Les récompenses, arrêts et succès sont persistants et idempotents. Stephen Hawking reste le pilote le plus difficile et le plus coûteux à débloquer.
+
+Les classements proposent désormais **Sprint / Endurance**, puis **Avec / Sans objets**, pour les courses complètes comme pour les meilleurs tours. L’API publique ajoute `endurance` et `enduranceWithItems` sans modifier les classements existants. Migration SQLite additive : aucun effacement de compte, record, achat ou progression.
 
 ## Objets de course
 

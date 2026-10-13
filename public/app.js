@@ -1,3 +1,6 @@
+import { createEnduranceUI } from './endurance-ui.js';
+import { createPitVisuals } from './endurance-visuals.js';
+import { createCourse } from './racing.js';
 import { createItemVisuals } from './item-visuals.js';
 import { createItemsUI } from './items-ui.js';
 import * as THREE from '/three.js';
@@ -21,7 +24,7 @@ const selection = createSelection(choices => {
   updateFavorite();
   if (currentRoom && state?.lobby.phase === 'waiting') {
     const data = { chairId:choices.chairId, pilotId:choices.pilotId };
-    if (state.lobby.hostId === playerId && state.lobby.mode === 'race') data.trackId = choices.trackId;
+    if (state.lobby.hostId === playerId && ['race','endurance'].includes(state.lobby.mode)) data.trackId = choices.trackId;
     send('configure',data);
   }
 });
@@ -31,7 +34,7 @@ function updateFavorite() {
   $('#favoriteChair').textContent = favorite ? '★ FAVORI' : '☆ FAVORI';
 }
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let itemVisuals;
+let itemVisuals,pitVisuals,pitTrack;
 let scene, camera, renderer, sun, effects, environment, models, preparedChair, world = new Map(), raf, keys = {};
 const snapshots = new SnapshotBuffer(100);
 let previousFrame = 0, cameraReady = false, builtTrack = null, lobbySignature = '', lastHudUpdate = 0, finishPresentedAt = null;
@@ -71,7 +74,7 @@ function connect() {
     state.lobby.track = state.tracks.find(track => track.id === state.lobby.trackId);
     snapshots.push(state, performance.now());
     if (reset) { cameraReady = false; finishPresentedAt = null; effects?.reset(); }
-    selection.setMultiplayer(state.lobby.trackId,state.lobby.hostId === playerId && (!state.lobby.mode || state.lobby.mode === 'race'));
+    selection.setMultiplayer(state.lobby.trackId,state.lobby.hostId === playerId && (!state.lobby.mode || ['race','endurance'].includes(state.lobby.mode)));
     if (portal.page === 'garage') renderLobby();
     // Lobby DOM is event-driven; physics snapshots should not rebuild 12 cards at 15 Hz.
     const signature = JSON.stringify([state.lobby.itemsEnabled,state.lobby.mode,state.lobby.difficulty,state.lobby.cup,state.lobby.roomId,state.lobby.phase,state.lobby.hostId,state.lobby.trackId,state.racers.map(r=>[r.id,r.name,r.chairId,r.pilotId,r.isBot,r.finished,r.title,r.level])]);
@@ -159,7 +162,7 @@ function resize() {
 }
 async function showRace() {
   portal.show('race');
-  $('#raceTrackName').textContent = `${state.lobby.track.name.toUpperCase()} · ${state.lobby.difficulty || '100'}cc${state.lobby.cup ? ` · MANCHE ${state.lobby.cup.round}/5` : ''}`;
+  $('#raceTrackName').textContent = `${state.lobby.track.name.toUpperCase()} · ${state.lobby.difficulty || '100'}cc${state.lobby.mode==='endurance'?' · ENDURANCE':''}${state.lobby.cup ? ` · MANCHE ${state.lobby.cup.round}/5` : ''}`;
   $('#raceStatus').textContent = 'À TOI LA PISTE !';
   try { models = await loadModels(); }
   catch (error) { returnToGarage(); $('#menuStatus').textContent = 'Impossible de charger les modèles 3D. Réessaie après rechargement.'; console.error(error); return; }
@@ -174,6 +177,8 @@ function draw3D(now) {
   syncRacers(now, dt);
   if(state.items?.enabled && !itemVisuals)itemVisuals=createItemVisuals(scene);
   itemVisuals?.update(state.items,now);
+  if(state.lobby.mode==='endurance'&&pitTrack!==state.lobby.trackId){if(pitVisuals)disposeObject(pitVisuals);pitVisuals=createPitVisuals(createCourse(state.lobby.track));pitTrack=state.lobby.trackId;scene.add(pitVisuals);}
+  if(pitVisuals)pitVisuals.visible=state.lobby.mode==='endurance';
   animateWorld(environment, now, dt); effects.update(world, dt);
   const object = world.get(playerId);
   if (object) {
@@ -216,7 +221,7 @@ function updateRaceUi() {
   if (!state) return;
   const me = state.racers.find(r => r.id === playerId) || state.racers.find(r => !r.isBot);
   const sorted = [...state.racers].sort(compareRacers);
-  itemUI.update(state,me);
+  itemUI.update(state,me);enduranceUI.update(state,me);
   if (me) {
     $('#lapText').textContent = `TOUR ${Math.min(me.lap, state.lobby.laps)} / ${state.lobby.laps}`;
     $('#speedValue').textContent = Math.round(Math.abs(me.speed) * 3.6);
@@ -252,6 +257,7 @@ document.addEventListener('keydown', event => {
   if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) event.preventDefault();
   if (event.repeat || keys[key]) return;
   keys[key] = true;
+  if(enduranceUI.key(key)){event.preventDefault();return;}
   if(key==='a'){event.preventDefault();send('use_item');return;}
   updateInput();
 });
@@ -280,7 +286,7 @@ async function launchRace() {
   } finally {portal.setBusy(false);if(failure)portal.error(failure);}
 }
 function stopRace() {
-  cancelAnimationFrame(raf); keys = {}; updateInput(); effects?.reset(); itemUI.clear(); document.body.classList.remove('in-race');
+  cancelAnimationFrame(raf); keys = {}; updateInput(); effects?.reset(); itemUI.clear();enduranceUI.clear(); document.body.classList.remove('in-race');
 }
 function leaveRoom() {stopRace();send('leave_room');}
 function returnToGarage() {stopRace();leaveRoom();}
@@ -289,9 +295,10 @@ $('#startButton').onclick = returnToRoom;
 $('#garageRoomButton').onclick = returnToRoom;
 $('#backButton').onclick = leaveRoom;
 $('#againButton').onclick = returnToRoom;
+const enduranceUI=createEnduranceUI((type,data)=>send(type,data));
 const itemUI=createItemsUI(()=>send('use_item'));
 portal = createPortal({
-  onView(page) {selection.setVisible(page==='garage');if(page!=='race'){cancelAnimationFrame(raf);itemUI.clear();}},
+  onView(page) {selection.setVisible(page==='garage');if(page!=='race'){cancelAnimationFrame(raf);itemUI.clear();enduranceUI.clear();}},
   onSignedIn(user) {selection.setChoices(user);connect();},
   onSignedOut() {const old=socket;socket=null;old?.close();currentRoom=null;playerId=null;stopRace();portal.setOnline(false);},
   onProfile(user) {selection.setProgression(user?.progression || null);updateFavorite();},

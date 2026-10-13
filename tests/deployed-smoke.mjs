@@ -15,10 +15,10 @@ try {
   await page.locator('#roomBrowser').waitFor();
   assert.equal(await page.locator('.room-card').count(),3);
   await page.locator('#openCollection').click();
-  assert.equal(await page.locator('#shopGrid .shop-card').count(),15);
+  assert.equal(await page.locator('#shopGrid .shop-card').count(),21);
   assert.equal(await page.locator('[data-item="paint-lagoon"]').isDisabled(),true);
   await page.locator('#achievementsTab').click();
-  assert.equal(await page.locator('.achievement-card').count(),20);
+  assert.equal(await page.locator('.achievement-card').count(),27);
   await page.locator('#closeCollection').click();
   await page.locator('[data-career="50"]:enabled').waitFor();
   assert.equal(await page.locator('[data-career="100"]').isDisabled(),true);
@@ -26,6 +26,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('#recordsStatus').textContent.startsWith('Un meilleur temps'));
   assert.equal(await page.locator('#recordsTrack option').count(),5);
   assert.equal(await page.locator('#recordsItems option').count(),2);
+  await page.locator('#recordsMode').selectOption('endurance');assert.match(await page.locator('#recordsRaceTitle').textContent(),/15 TOURS/);
   await page.locator('#closeRecords').click();
   await page.locator('[data-career="50"]').click();
   await page.locator('#roomRoster .room-seat').first().waitFor();
@@ -55,6 +56,7 @@ try {
   }
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.locator('#startButton').click();
+  await page.locator('#competitionMode').selectOption('endurance');
   await page.locator('#competitionItems').selectOption('on');
   await page.evaluate(async()=>{const THREE=await import('/three.js');THREE.Scene.prototype.onAfterRender=function(_renderer,scene){const boxes=scene.getObjectByName('mystery-boxes');if(boxes)window.deployedBoxes=boxes.count;};});
   await page.locator('#launchRace').click();
@@ -62,6 +64,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#raceMapDots').children.length === 12 && document.querySelector('#countdown').textContent === '');
   await page.waitForFunction(()=>window.deployedBoxes>0);
   assert.equal(await page.locator('#itemHud').isVisible(),true);
+  assert.equal(await page.locator('#tyreHud').isVisible(),true);assert.match(await page.locator('#lapText').textContent(),/\/ 15/);
   await page.keyboard.press('a');
   await page.keyboard.down('w'); await page.waitForTimeout(2300); await page.keyboard.up('w');
   assert.ok(Number(await page.locator('#speedValue').textContent()) > 10);
@@ -71,5 +74,5 @@ try {
   assert.deepEqual(errors, []); assert.deepEqual(failed, []);
   await page.locator('#roomBrowser').waitFor();
   await page.locator('#logoutButton').click();await page.locator('#authScreen').waitFor();
-  console.log('Docker smoke OK: mystery boxes/items HUD/A key, separate record filters, economy/shop/achievements, global records, career locks/private room, account/session, 3 rooms, 12 racers, local GLB assets, shaders, 3 selection screens, 1440/1024/390px, logout, no browser errors.');
+  console.log('Docker smoke OK: 15-lap endurance/tyre HUD, sprint/endurance records, mystery boxes/items HUD/A key, separate record filters, economy/shop/achievements, global records, career locks/private room, account/session, 3 rooms, 12 racers, local GLB assets, shaders, 3 selection screens, 1440/1024/390px, logout, no browser errors.');
 } finally { await browser.close(); }

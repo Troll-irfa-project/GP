@@ -8,8 +8,8 @@ import { makeChair } from '../public/chairs.js';
 import { sceneryPlacements } from '../public/scenery.js';
 import { distanceToRoute } from '../public/motion.js';
 
-test('nine cosmetic pilots and eight distinct chairs preserve the 35-point budget', () => {
-  assert.equal(pilots.length, 9); assert.equal(chairs.length, 8);
+test('eleven cosmetic pilots and ten distinct chairs preserve the 35-point budget', () => {
+  assert.equal(pilots.length, 11); assert.equal(chairs.length, 10);
   for (const c of chairs) {
     const stats = ['speed', 'accel', 'handling', 'offroad', 'weight'].map(key => c[key]);
     assert.equal(stats.reduce((a, b) => a + b), 35);
@@ -53,7 +53,7 @@ test('WebSocket: each human and bot keeps its own pilot and chair', { timeout: 1
   try {
     for (let i = 0; i < 100; i++) { try { if ((await fetch(`http://127.0.0.1:${port}`)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 25)); }
     const a = await client(), b = await client();
-    assert.equal((await a.wait(m => m.type === 'hello')).pilots.length, 9);
+    assert.equal((await a.wait(m => m.type === 'hello')).pilots.length, 11);
     await b.wait(m => m.type === 'hello');
     a.send({ type: 'join_room', roomId: 'room-1', name: 'Alice', chairId: 'comet', pilotId: 'maya', trackId: 'coast' });
     const joinedA = await a.wait(m => m.type === 'joined');

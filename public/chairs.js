@@ -7,6 +7,8 @@ export const silhouettes = {
   atlas: { label: 'Châssis large · arceau renforcé', width: 1.4, length: 1.7, back: 1.2, wheel: .48 },
   drift: { label: 'Roues inclinées · châssis ouvert', width: 1.05, length: 1.4, back: .9, wheel: .52 },
   trail: { label: 'Six roues crantées · garde au sol haute', width: 1.25, length: 1.85, back: 1.1, wheel: .49 },
+  stint: {label:'Prototype GT · carénages longue distance',width:1.22,length:2.05,back:.96,wheel:.42},
+  relay: {label:'Châssis atelier · flancs renforcés',width:1.18,length:1.72,back:1.08,wheel:.45},
   apex: { label:'Monoplace électrique · ailes avant et arrière',width:1.08,length:2.1,back:.78,wheel:.36 },
   vector: { label: 'Double aileron · cockpit fuselé', width:1.12,length:1.65,back:.94,wheel:.43 },
   nomad: { label: 'Quatre grandes roues · pare-buffle', width:1.3,length:1.8,back:1.12,wheel:.46 },
@@ -64,7 +66,7 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
     box('arm-support', [.07, .4, .07], [side * .51, .94, .23], metal);
     box('headlight', [.16, .10, .04], [side * .36, .53, -spec.length / 2 - .03], lamp);
   }
-  const wheelZ = chair.id === 'trail' ? [-.62, 0, .62] : chair.id === 'nomad' ? [-.64,.64] : chair.id === 'apex' ? [-.8,.66] : [.27];
+  const wheelZ = chair.id === 'trail' ? [-.62, 0, .62] : ['nomad','stint','relay'].includes(chair.id) ? [-.64,.64] : chair.id === 'apex' ? [-.8,.66] : [.27];
   for (const side of [-1, 1]) for (const z of wheelZ) {
     const wheel = new THREE.Group();
     wheel.name = 'drive-wheel'; wheel.position.set(side * (spec.width / 2 + .12), spec.wheel, z);
@@ -89,14 +91,25 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
     }
     group.add(wheel);
   }
-  if (!['trail','nomad','apex'].includes(chair.id)) for (const side of [-1, 1]) {
+  if (!['trail','nomad','apex','stint','relay'].includes(chair.id)) for (const side of [-1, 1]) {
     const pivot = new THREE.Group(); pivot.name = 'caster-pivot'; pivot.position.set(side * .45, .18, -.72);
     const caster = new THREE.Group(); caster.name = 'caster'; caster.userData.radius = .18;
     const tyre = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, .13, 16), dark); tyre.rotation.z = Math.PI / 2; caster.add(tyre);
     const hub = new THREE.Mesh(new THREE.CylinderGeometry(.065, .065, .14, 12), metal); hub.rotation.z = Math.PI / 2; caster.add(hub);
     pivot.add(caster); group.add(pivot);
   }
-  if (chair.id === 'apex') {
+  if(chair.id==='stint'){
+    box('gt-long-nose',[.92,.22,.77],[0,.65,-.91]).rotation.x=-.18;
+    box('gt-rear-deck',[1.36,.16,.64],[0,.91,.92]);
+    box('gt-spoiler',[1.67,.08,.22],[0,1.16,1.08],white);
+    for(const side of [-1,1]){box('gt-wheel-fairing',[.34,.19,1.9],[side*.74,.91,0]);box('gt-running-light',[.22,.04,.05],[side*.73,.93,-.96],lamp);}
+    box('gt-racing-stripe',[.10,.025,.67],[0,.79,-.95],white);
+  }else if(chair.id==='relay'){
+    box('relay-service-case',[.84,.33,.38],[0,1.13,.85],metal);
+    box('relay-roll-hoop',[1.35,.11,.13],[0,1.97,.69],trim);
+    for(const side of [-1,1]){box('relay-hoop-upright',[.1,1.15,.1],[side*.62,1.4,.69],metal);box('relay-side-armor',[.24,.42,1.3],[side*.67,.76,0]);box('relay-reflector',[.035,.08,.85],[side*.8,.85,0],white);}
+    box('relay-tool-latch',[.16,.12,.04],[0,1.15,1.05],dark);
+  }else if (chair.id === 'apex') {
     box('f1-nose',[.38,.22,.95],[0,.58,-.93],paint).rotation.x=-.12;
     box('f1-front-wing',[1.9,.07,.35],[0,.30,-1.42],paint);
     box('f1-front-wing-flap',[1.65,.06,.18],[0,.39,-1.35],metal);
@@ -188,10 +201,14 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
     oval('cap-visor', [.245, .025, .17], [0, 2.05, -.20], paint);
   }
   if (pilot.style === 'helmet') {
-    oval('helmet-shell',[.29,.20,.27],[0,2.06,.08],clothes);
+    oval('helmet-shell',[.29,.20,.27],[0,2.06,.08],pilot.id==='sacha'?white:clothes);
     box('helmet-visor',[.46,.115,.07],[0,1.97,-.177],metal);
     for(const side of [-1,1])oval('helmet-ear',[.07,.10,.12],[side*.268,1.94,.06],trim);
     box('helmet-stripe',[.06,.025,.35],[0,2.255,.05],trim);
+  }
+  if(['nora','sacha'].includes(pilot.id)){
+    for(const side of [-1,1])box('endurance-suit-stripe',[.04,.38,.025],[side*.16,1.34,-.24],white);
+    box('endurance-badge',[.12,.08,.035],[-.13,1.51,-.28],trim);
   }
   box('controller', [.16, .08, .23], [.52, 1.25, -.35], dark);
   limb('joystick', [.52, 1.30, -.37], [.52, 1.40, -.37], .025, metal);

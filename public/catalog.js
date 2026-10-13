@@ -7,6 +7,8 @@ export const chairs=[
  {id:'pulse',name:'Pulse',tag:'Accélération',color:'#70a6ff',speed:9,accel:10,handling:6,offroad:4,weight:6},
  {id:'vector',name:'Vector',tag:'Polyvalence',color:'#b389ff',speed:8,accel:8,handling:8,offroad:5,weight:6},
  {id:'nomad',name:'Nomad',tag:'Exploration',color:'#f0b66b',speed:7,accel:6,handling:6,offroad:9,weight:7},
+ {id:'stint',name:'Stint GT',tag:'Endurance GT',color:'#35c9bd',speed:8,accel:7,handling:7,offroad:7,weight:6},
+ {id:'relay',name:'Relay R',tag:'Atelier course',color:'#ffad49',speed:7,accel:8,handling:8,offroad:6,weight:6},
  {id:'apex',name:'Apex F1',tag:'Monoplace',color:'#f3394e',speed:10,accel:10,handling:9,offroad:3,weight:3}
 ];
 // Appearance only: pilot choice never changes vehicle handling or performance.
@@ -21,6 +23,8 @@ export const pilots = [
 ];
 pilots.push(
  {id:'aurore',name:'Aurore Vega',short:'Aurore',role:'L’horizon n’est que le départ',color:'#a17bff',skin:'#e2ad89',hair:'#e9dcec',style:'helmet',portrait:null},
+ {id:'nora',name:'Nora Flux',short:'Nora',role:'La précision sur quinze tours',color:'#2ec8bc',skin:'#ae795e',hair:'#28343e',style:'helmet',portrait:null},
+ {id:'sacha',name:'Sacha Volt',short:'Sacha',role:'Toujours là au dernier relais',color:'#f36256',skin:'#e9b18d',hair:'#4b2928',style:'helmet',portrait:null},
  {id:'idris',name:'Idris Sol',short:'Idris',role:'Le soleil au bout de la piste',color:'#efba49',skin:'#9c6849',hair:'#252630',style:'helmet',portrait:null}
 );
 export const tracks=[

@@ -45,6 +45,23 @@ achievements.push(
   {id:'box-collector',name:'Surprise sur surprise',description:'Ouvrir 100 boîtes mystères lors de courses terminées.',metric:'itemBoxes',goal:100,coins:100,xp:300},
   {id:'item-marksman',name:'Trouble-fête',description:'Toucher 50 adversaires avec une échelle ou un revolver lors de courses terminées.',metric:'itemHits',goal:50,coins:150,xp:400}
 );
+shopItems.push(
+  {id:'title-distance',type:'title',name:'Longue distance',description:'Ton premier titre de pilote d’endurance.',price:800,level:4,achievement:'endurance-debut'},
+  {id:'pilot-nora',type:'pilot',target:'nora',name:'Nora Flux',description:'Spécialiste des relais, casque turquoise. Apparence uniquement.',price:4000,level:10,achievement:'endurance-regular'},
+  {id:'chair-stint',type:'chair',target:'stint',name:'Stint GT',description:'Carénage longue distance. Stats : 8 / 7 / 7 / 7 / 6 = 35. Usure identique aux autres fauteuils.',price:6000,level:12,achievement:'endurance-winner'},
+  {id:'title-clockwork',type:'title',name:'Horloger des stands',description:'Titre gagné au pilotage pur en endurance.',price:3000,level:12,achievement:'endurance-pure'},
+  {id:'pilot-sacha',type:'pilot',target:'sacha',name:'Sacha Volt',description:'Pilote du chaos, combinaison rouge et casque blanc. Apparence uniquement.',price:6500,level:14,achievement:'endurance-chaos'},
+  {id:'chair-relay',type:'chair',target:'relay',name:'Relay R',description:'Châssis atelier aux roues carénées. Stats : 7 / 8 / 8 / 6 / 6 = 35. Aucun avantage au QTE.',price:6500,level:14,achievement:'pit-perfect'}
+);
+achievements.push(
+  {id:'endurance-debut',name:'Quinze tours plus tard',description:'Terminer une course d’endurance. Débloque l’achat de Longue distance.',metric:'enduranceFinishes',goal:1,coins:50,xp:200},
+  {id:'endurance-regular',name:'Le souffle long',description:'Terminer 10 endurances. Débloque Nora Flux.',metric:'enduranceFinishes',goal:10,coins:250,xp:800},
+  {id:'endurance-winner',name:'Au bout de l’effort',description:'Gagner 5 endurances. Débloque le Stint GT.',metric:'enduranceWins',goal:5,coins:250,xp:800},
+  {id:'endurance-pure',name:'Précision longue durée',description:'Gagner 3 endurances sans objets. Débloque Horloger des stands.',metric:'endurancePureWins',goal:3,coins:150,xp:500},
+  {id:'endurance-chaos',name:'Survivre au chaos',description:'Gagner 3 endurances avec objets. Débloque Sacha Volt.',metric:'enduranceItemWins',goal:3,coins:150,xp:500},
+  {id:'pit-perfect',name:'Mécanique de précision',description:'Réussir 10 arrêts sans erreur de QTE dans des endurances terminées. Débloque Relay R.',metric:'perfectPitStops',goal:10,coins:150,xp:500},
+  {id:'endurance-master',name:'Maître du relais',description:'Gagner sur les cinq circuits en endurance et remporter 5 endurances en 200cc.',goal:2,coins:500,xp:1500,requirements:[{metric:'enduranceCircuits',goal:5,label:'Circuits gagnés en endurance'},{metric:'enduranceEliteWins',goal:5,label:'Victoires endurance 200cc'}]}
+);
 export function achievementProgress(achievement,metrics) {
   return achievement.requirements ? achievement.requirements.filter(r=>(metrics[r.metric]||0)>=r.goal).length : metrics[achievement.metric]||0;
 }
@@ -53,9 +70,10 @@ export function levelProgress(xp) {
   const floor=250*(level-1)*level/2,next=250*level*(level+1)/2;
   return {level,current:xp-floor,required:next-floor,next};
 }
-export function raceReward(place,difficulty='100') {
+export function raceReward(place,difficulty='100',mode='race') {
   const multiplier=({'50':1,'100':1.15,'150':1.35,'200':1.6})[difficulty] || 1;
-  return {coins:Math.round((10+(12-place)*4)*multiplier),xp:Math.round((70+(12-place)*12)*multiplier)};
+  const duration=mode==='endurance'?4:1;
+  return {coins:Math.round((10+(12-place)*4)*multiplier)*duration,xp:Math.round((70+(12-place)*12)*multiplier)*duration};
 }
 export function cupReward(place,difficulty='100') {
   const multiplier=({'50':1,'100':1.15,'150':1.35,'200':1.6})[difficulty] || 1;
