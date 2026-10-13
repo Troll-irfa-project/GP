@@ -9,13 +9,13 @@ export function approachSpeed(speed, target, acceleration, dt) {
   return speed + Math.max(-step, Math.min(step, target - speed));
 }
 
-export function driveSpeed(speed, input, chair, grip, boost, skill, dt, upgrade = null) {
-  const top = topSpeed(chair) * grip * skill;
-  const target = input.brake ? -4 : input.gas ? Math.min(top * (boost > 0 ? 1.35 : 1), input.speedLimit ?? Infinity) : 0;
+export function driveSpeed(speed, input, chair, grip, boost, skill, dt, upgrade = null, itemBoost = 0, slow = 0) {
+  const top = topSpeed(chair) * grip * skill * (slow > 0 ? .8 : 1);
+  const target = input.brake ? -4 : input.gas ? Math.min(top * (boost > 0 ? 1.35 : itemBoost > 0 ? 1.2 : 1), input.speedLimit ?? Infinity) : 0;
   // Equal increments per second: 0 -> Vmax in 3.0–4.6 s for the current garage.
   const secondsToTop = 7 - chair.accel * .4;
   const acceleration = topSpeed(chair) / secondsToTop * (upgrade === 'module-start' ? 1.02 : 1);
-  const rate = input.brake ? 16 : !input.gas ? 5 : speed > target ? 13 : boost > 0 ? 18 : acceleration;
+  const rate = input.brake ? 16 : !input.gas ? 5 : speed > target ? 13 : boost > 0 || itemBoost > 0 ? 18 : acceleration;
   return approachSpeed(speed, target, rate, dt);
 }
 
@@ -72,7 +72,8 @@ export class SnapshotBuffer {
     out.x = a.x + (b.x - a.x) * alpha;
     out.z = a.z + (b.z - a.z) * alpha;
     out.heading = a.heading + angleDelta(a.heading, b.heading) * alpha;
-    for (const key of ['speed', 'steer', 'boost', 'drift']) out[key] = (a[key] || 0) + ((b[key] || 0) - (a[key] || 0)) * alpha;
+    for (const key of ['speed', 'steer', 'boost', 'drift', 'itemBoost', 'slow', 'blur', 'stun']) out[key] = (a[key] || 0) + ((b[key] || 0) - (a[key] || 0)) * alpha;
+    out.spin = a.spin > 0 ? Math.max(0,a.spin-(time-before.time)/1000) : alpha>=1 ? b.spin||0 : 0;
     out.drifting = alpha < .5 ? Boolean(a.wasDrifting) : Boolean(b.wasDrifting);
     // Reveal the result only when the interpolated vehicle has reached the line.
     out.finished = Boolean(a.finished || alpha >= 1 && b.finished);

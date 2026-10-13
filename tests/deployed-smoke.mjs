@@ -18,13 +18,14 @@ try {
   assert.equal(await page.locator('#shopGrid .shop-card').count(),15);
   assert.equal(await page.locator('[data-item="paint-lagoon"]').isDisabled(),true);
   await page.locator('#achievementsTab').click();
-  assert.equal(await page.locator('.achievement-card').count(),14);
+  assert.equal(await page.locator('.achievement-card').count(),20);
   await page.locator('#closeCollection').click();
   await page.locator('[data-career="50"]:enabled').waitFor();
   assert.equal(await page.locator('[data-career="100"]').isDisabled(),true);
   await page.locator('#openRecords').click();
   await page.waitForFunction(()=>document.querySelector('#recordsStatus').textContent.startsWith('Un meilleur temps'));
   assert.equal(await page.locator('#recordsTrack option').count(),5);
+  assert.equal(await page.locator('#recordsItems option').count(),2);
   await page.locator('#closeRecords').click();
   await page.locator('[data-career="50"]').click();
   await page.locator('#roomRoster .room-seat').first().waitFor();
@@ -53,9 +54,15 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  await startRoomRace(page);
+  await page.locator('#startButton').click();
+  await page.locator('#competitionItems').selectOption('on');
+  await page.evaluate(async()=>{const THREE=await import('/three.js');THREE.Scene.prototype.onAfterRender=function(_renderer,scene){const boxes=scene.getObjectByName('mystery-boxes');if(boxes)window.deployedBoxes=boxes.count;};});
+  await page.locator('#launchRace').click();
   await page.locator('#game').waitFor();
   await page.waitForFunction(() => document.querySelector('#raceMapDots').children.length === 12 && document.querySelector('#countdown').textContent === '');
+  await page.waitForFunction(()=>window.deployedBoxes>0);
+  assert.equal(await page.locator('#itemHud').isVisible(),true);
+  await page.keyboard.press('a');
   await page.keyboard.down('w'); await page.waitForTimeout(2300); await page.keyboard.up('w');
   assert.ok(Number(await page.locator('#speedValue').textContent()) > 10);
   const canvas = await page.locator('#game').boundingBox(); assert.equal(canvas.width, 1440); assert.equal(canvas.height, 900);
@@ -64,5 +71,5 @@ try {
   assert.deepEqual(errors, []); assert.deepEqual(failed, []);
   await page.locator('#roomBrowser').waitFor();
   await page.locator('#logoutButton').click();await page.locator('#authScreen').waitFor();
-  console.log('Docker smoke OK: economy/shop/achievements, global records, career locks/private room, account/session, 3 rooms, 12 racers, local GLB assets, shaders, 3 selection screens, 1440/1024/390px, logout, no browser errors.');
+  console.log('Docker smoke OK: mystery boxes/items HUD/A key, separate record filters, economy/shop/achievements, global records, career locks/private room, account/session, 3 rooms, 12 racers, local GLB assets, shaders, 3 selection screens, 1440/1024/390px, logout, no browser errors.');
 } finally { await browser.close(); }

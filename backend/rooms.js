@@ -1,3 +1,4 @@
+import { createItems, resetRacerItems, tickItems, collectItems } from '../public/items.js';
 import { randomUUID } from 'node:crypto';
 import { chairs, tracks, pilots } from '../public/catalog.js';
 import { MAX_RACERS } from '../public/game-config.js';
@@ -22,7 +23,7 @@ export class RoomManager {
   error(client, message) { this.send(client, 'error', { message }); }
   host(room) { return room.members.values().next().value || null; }
   list() {
-    return [...this.rooms.values()].filter(r=>!r.private).map(r => ({id:r.id,name:r.name,trackId:r.trackId,mode:r.mode,difficulty:r.difficulty,phase:r.phase,humans:r.members.size,bots:MAX_RACERS-r.members.size,capacity:MAX_RACERS,host:this.host(r)?.user.username || null}));
+    return [...this.rooms.values()].filter(r=>!r.private).map(r => ({id:r.id,name:r.name,trackId:r.trackId,mode:r.mode,difficulty:r.difficulty,itemsEnabled:r.itemsEnabled,phase:r.phase,humans:r.members.size,bots:MAX_RACERS-r.members.size,capacity:MAX_RACERS,host:this.host(r)?.user.username || null}));
   }
   announce() { const rooms = this.list(); for (const c of this.clients) this.send(c, 'rooms', {rooms}); }
   add(client) { this.clients.add(client); this.send(client, 'rooms', { rooms:this.list() }); }
@@ -31,25 +32,27 @@ export class RoomManager {
     return {id:`bot-${++this.nextBot}`,name:names[index % names.length],chairId:chairs[index % 5].id,pilotId:pilots.filter(p=>p.id!=='hawking')[index % 6].id,isBot:true,skill:.90+(index%6)*.016};
   }
   reset(room, preserve = false) {
+    room.itemsEnabled ??= false;
     room.mode ??= 'race'; room.difficulty ??= '100'; room.deadline = null;
     if (!preserve) room.cup = null;
     if (!preserve && room.mode !== 'race') room.trackId = tracks[0].id;
+    room.items = createItems(courses.get(room.trackId),room.itemsEnabled);
     room.phase = 'waiting'; room.raceId = randomUUID(); room.raceTime = 0; room.countdown = 0; room.winner = null; room.recorded = new Set();
     const humans = [...room.members.values()].map(c => { c.racer.input = {}; return c.racer; });
     if (!preserve) room.racers = humans;
     while (room.racers.length < MAX_RACERS) room.racers.push(this.bot(room.racers.length));
     room.racers.forEach((r,i) => {
       r.input = {}; r.aiDifficulty=room.difficulty; r.skill = difficulties.find(d=>d.id===room.difficulty).speed * (.97+(i%6)*.012);
-      spawnRacer(r,i,courses.get(room.trackId));
+      spawnRacer(r,i,courses.get(room.trackId)); resetRacerItems(r);
     });
   }
   broadcast(room) {
     const lobby = {roomId:room.id,roomName:room.name,hostId:this.host(room)?.racer.id || null,phase:room.phase,
       trackId:room.trackId,laps:3,capacity:MAX_RACERS,raceId:room.raceId,raceTime:room.raceTime,
-      mode:room.mode,difficulty:room.difficulty,deadline:room.deadline,cup:room.cup ? {round:room.cup.round+1,total:5,complete:room.cup.complete,standings:standings(room.cup.entries).map(({userId,...entry})=>entry)} : null,
+      mode:room.mode,difficulty:room.difficulty,itemsEnabled:room.itemsEnabled,deadline:room.deadline,cup:room.cup ? {round:room.cup.round+1,total:5,complete:room.cup.complete,standings:standings(room.cup.entries).map(({userId,...entry})=>entry)} : null,
       started:room.phase==='racing'||room.phase==='results',countdown:room.countdown,winner:room.winner};
     const racers = room.racers.map(({userId, ...r}) => r);
-    for (const c of room.members.values()) this.send(c,'state',{lobby,racers,serverTime:Date.now()});
+    for (const c of room.members.values()) this.send(c,'state',{lobby,racers,items:room.items,serverTime:Date.now()});
   }
   join(client, data) {
     const room = this.rooms.get(data.roomId);
@@ -81,12 +84,14 @@ export class RoomManager {
   configure(client, data) {
     const room = this.rooms.get(client.roomId);
     if (!room || room.phase !== 'waiting') return this.error(client,'Les choix sont verrouillés pendant la course.');
+    if(data.itemsEnabled!==undefined && (typeof data.itemsEnabled!=='boolean' || this.host(room)!==client))return this.error(client,'Seul l’hôte peut choisir une option objets valide.');
     if ((data.mode !== undefined || data.difficulty !== undefined) && (this.host(room) !== client || room.private)) return this.error(client,'Seul l’hôte peut régler un salon multijoueur.');
     if (data.mode !== undefined && !['race','tournament'].includes(data.mode) || data.difficulty !== undefined && !difficulties.some(d=>d.id===data.difficulty)) return this.error(client,'Mode ou difficulté invalide.');
     if (data.trackId && data.trackId !== room.trackId && this.host(room) !== client) return this.error(client,'Seul l’hôte choisit le circuit.');
     if (data.chairId && !validChair(data.chairId) || data.pilotId && !validPilot(data.pilotId) || data.trackId && !tracks.some(t=>t.id===data.trackId)) return this.error(client,'Choix de course invalide.');
     const profile=this.accounts.profile(client.user.id);
     if (!ownsSelection(profile.progression,'chair',data.chairId || client.racer.chairId) || !ownsSelection(profile.progression,'pilot',data.pilotId || client.racer.pilotId)) return this.error(client,'Ce pilote ou fauteuil n’est pas encore dans ta collection.');
+    if (data.itemsEnabled!==undefined) room.itemsEnabled=data.itemsEnabled;
     if (data.mode) room.mode = data.mode;
     if (data.difficulty) room.difficulty = data.difficulty;
     if (data.chairId) client.racer.chairId = data.chairId;
@@ -94,8 +99,8 @@ export class RoomManager {
     const changed = data.trackId && data.trackId !== room.trackId;
     if (changed) room.trackId = data.trackId;
     this.accounts.preferences(client.user.id,{chairId:client.racer.chairId,pilotId:client.racer.pilotId});
-    if (changed || data.mode || data.difficulty) this.reset(room);
-    this.broadcast(room); if (changed || data.mode || data.difficulty) this.announce();
+    if (changed || data.mode || data.difficulty || data.itemsEnabled!==undefined) this.reset(room);
+    this.broadcast(room); if (changed || data.mode || data.difficulty || data.itemsEnabled!==undefined) this.announce();
   }
   start(client) {
     const room = this.rooms.get(client.roomId);
@@ -137,7 +142,7 @@ export class RoomManager {
         standings(room.cup.entries).forEach((entry,i)=>{
           // Departed racers are AI relays, never a source of offline career wins.
           if (!entry.userId || !room.members.has(entry.userId)) return;
-          this.accounts.recordTournament({id:room.cup.id,userId:entry.userId,difficulty:room.difficulty,mode:room.mode,place:i+1,points:entry.points,wonRaces:entry.wins});
+          this.accounts.recordTournament({id:room.cup.id,userId:entry.userId,difficulty:room.difficulty,mode:room.mode,place:i+1,points:entry.points,wonRaces:entry.wins,itemsEnabled:room.itemsEnabled});
           const client=room.members.get(entry.userId),user=this.accounts.profile(entry.userId);
           client.racer.level=user.progression?.level || client.racer.level;
           this.send(client,'profile',{user});
@@ -153,6 +158,11 @@ export class RoomManager {
     if (data.type === 'leave_room') return this.leave(client);
     if (data.type === 'configure') return this.configure(client,data);
     if (data.type === 'start') return this.start(client);
+    if(data.type==='use_item') {
+      const room=this.rooms.get(client.roomId);
+      if(room?.phase==='racing' && room.itemsEnabled && client.racer && !client.racer.finished)client.racer.itemUseQueued=true;
+      return;
+    }
     if (data.type === 'input' && client.racer && this.rooms.get(client.roomId)?.phase === 'racing') {
       client.racer.input = Object.fromEntries(['gas','brake','left','right','drift'].map(k=>[k,data.input?.[k]===true]));
     }
@@ -171,11 +181,13 @@ export class RoomManager {
       }
       if (room.phase !== 'racing') continue;
       room.raceTime += dt;
-      stepRace(room.racers,courses.get(room.trackId),chairs,dt,3,room.raceTime);
+      const course=courses.get(room.trackId);
+      tickItems(room.racers,course,room.items,dt,room.raceTime);
+      stepRace(room.racers,course,chairs,dt,3,room.raceTime,previous=>collectItems(room.racers,course,room.items,previous,room.raceTime));
       const sorted = [...room.racers].sort(compareRacers);
       if (sorted[0].finished) room.winner = sorted[0].name;
       for (const [i,r] of sorted.entries()) if (r.finished && !r.dnf && r.userId && !room.recorded.has(r.id)) {
-        this.accounts.recordResult({raceId:room.raceId,userId:r.userId,trackId:room.trackId,time:r.finishTime,bestLap:r.bestLapTime,place:i+1,difficulty:room.difficulty});
+        this.accounts.recordResult({raceId:room.raceId,userId:r.userId,trackId:room.trackId,time:r.finishTime,bestLap:r.bestLapTime,place:i+1,difficulty:room.difficulty,itemsEnabled:room.itemsEnabled,itemStats:r.itemStats});
         room.recorded.add(r.id);
         const client = room.members.get(r.userId);
         if (client) {

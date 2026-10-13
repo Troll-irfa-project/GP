@@ -28,7 +28,7 @@ export function createRaceEffects(scene) {
       emission += dt * 38; const emit = Math.floor(emission); emission -= emit;
       for (const model of models.values()) {
         const pose = model.userData.pose; if (!pose || Math.abs(pose.speed) < 4) continue;
-        if (pose.drifting || pose.boost > .05) for (let i = 0; i < emit; i++) for (const side of [-1, 1]) spawn(pose, side, pose.boost > .05);
+        if (pose.drifting || pose.boost > .05 || pose.itemBoost > .05) for (let i = 0; i < emit; i++) for (const side of [-1, 1]) spawn(pose, side, pose.boost > .05 || pose.itemBoost > .05);
       }
       for (let i = 0; i < capacity; i++) {
         if (life[i] <= 0) continue;

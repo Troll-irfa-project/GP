@@ -12,7 +12,7 @@ function client(db,manager,id){const messages=[],c={user:db.profile(id),ws:{read
 test('reduced rewards, raised prices, exact F1 stats and distinct F1 geometry',()=>{
   assert.equal(raceReward(1,'50').coins,54);assert.equal(raceReward(12,'50').coins,10);
   assert.equal(cupReward(1,'50').coins,168);
-  assert.equal(shopItems.length,15);assert.equal(achievements.length,14);
+  assert.equal(shopItems.length,15);assert.equal(achievements.length,20);
   const hawking=shopItems.find(i=>i.id==='pilot-hawking');
   assert.ok(shopItems.filter(i=>i!==hawking).every(i=>i.price<hawking.price&&i.level<hawking.level));
   const f1=chairs.find(c=>c.id==='apex');assert.deepEqual(['speed','accel','handling','offroad','weight'].map(k=>f1[k]),[10,10,9,3,3]);
@@ -27,8 +27,8 @@ test('migration locks formerly free Hawking without removing purchases or balanc
     db.db.prepare("UPDATE users SET pilot_id='hawking' WHERE id=?").run(id);
     db.db.prepare('INSERT INTO inventory VALUES(?,?)').run(id,'paint-gold');
     db.db.prepare('INSERT INTO earned_achievements VALUES(?,?)').run(id,'cup-winner');
-    db.db.prepare("INSERT INTO race_results VALUES('old',?,'coast',50000,1,0,'200',1)").run(id);
-    db.db.prepare("INSERT INTO tournament_results VALUES('old',?,'200','career',1,75,0,1,5)").run(id);
+    db.db.prepare("INSERT INTO race_results(race_id,user_id,track_id,time_ms,place,created_at,difficulty,balance_version) VALUES('old',?,'coast',50000,1,0,'200',1)").run(id);
+    db.db.prepare("INSERT INTO tournament_results(tournament_id,user_id,difficulty,mode,place,points,created_at,balance_version,won_races) VALUES('old',?,'200','career',1,75,0,1,5)").run(id);
     db.db.prepare('DELETE FROM economy_migrations WHERE id=2').run();db.economy.migrateBalance();
     const p=db.profile(id);assert.equal(p.pilotId,'maya');assert.equal(p.progression.coins,7777);assert.equal(p.progression.xp,75000);
     assert.ok(p.progression.owned.includes('paint-gold'));assert.ok(p.progression.earned.includes('cup-winner'));

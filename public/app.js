@@ -1,3 +1,5 @@
+import { createItemVisuals } from './item-visuals.js';
+import { createItemsUI } from './items-ui.js';
 import * as THREE from '/three.js';
 import { makeChair, animateChair } from './chairs.js';
 import { pilots } from './catalog.js';
@@ -29,6 +31,7 @@ function updateFavorite() {
   $('#favoriteChair').textContent = favorite ? '★ FAVORI' : '☆ FAVORI';
 }
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let itemVisuals;
 let scene, camera, renderer, sun, effects, environment, models, preparedChair, world = new Map(), raf, keys = {};
 const snapshots = new SnapshotBuffer(100);
 let previousFrame = 0, cameraReady = false, builtTrack = null, lobbySignature = '', lastHudUpdate = 0, finishPresentedAt = null;
@@ -71,7 +74,7 @@ function connect() {
     selection.setMultiplayer(state.lobby.trackId,state.lobby.hostId === playerId && (!state.lobby.mode || state.lobby.mode === 'race'));
     if (portal.page === 'garage') renderLobby();
     // Lobby DOM is event-driven; physics snapshots should not rebuild 12 cards at 15 Hz.
-    const signature = JSON.stringify([state.lobby.mode,state.lobby.difficulty,state.lobby.cup,state.lobby.roomId,state.lobby.phase,state.lobby.hostId,state.lobby.trackId,state.racers.map(r=>[r.id,r.name,r.chairId,r.pilotId,r.isBot,r.finished,r.title,r.level])]);
+    const signature = JSON.stringify([state.lobby.itemsEnabled,state.lobby.mode,state.lobby.difficulty,state.lobby.cup,state.lobby.roomId,state.lobby.phase,state.lobby.hostId,state.lobby.trackId,state.racers.map(r=>[r.id,r.name,r.chairId,r.pilotId,r.isBot,r.finished,r.title,r.level])]);
     if (signature !== lobbySignature) {lobbySignature=signature;portal.updateWaiting(state,playerId);}
     const me = state.racers.find(r=>r.id===playerId);
     if (me?.dnf && state.lobby.phase === 'results' && portal.page === 'race') finish();
@@ -141,7 +144,7 @@ function syncRacers(now, dt) {
     const pose = object.userData.pose;
     if (snapshots.sample(r.id, now, pose)) {
       object.position.set(pose.x, .41, pose.z);
-      object.rotation.y = modelYaw(pose.heading);
+      object.rotation.y = modelYaw(pose.heading) + (pose.spin>0 ? (1-pose.spin/.5)*Math.PI*2 : 0);
       animateChair(object, pose, dt, now);
     }
   }
@@ -169,12 +172,14 @@ function draw3D(now) {
   const dt = previousFrame ? Math.min(.05, (now - previousFrame) / 1000) : 1 / 60;
   previousFrame = now;
   syncRacers(now, dt);
+  if(state.items?.enabled && !itemVisuals)itemVisuals=createItemVisuals(scene);
+  itemVisuals?.update(state.items,now);
   animateWorld(environment, now, dt); effects.update(world, dt);
   const object = world.get(playerId);
   if (object) {
     const heading = object.userData.pose.heading;
     const speed = Math.abs(object.userData.pose.speed || 0);
-    const targetFov = 54 + Math.min(8, speed * .28) + (object.userData.pose.boost > .05 ? 4 : 0);
+    const targetFov = 54 + Math.min(8, speed * .28) + (object.userData.pose.boost > .05 || object.userData.pose.itemBoost > .05 ? 4 : 0);
     const nextFov = camera.fov + (targetFov - camera.fov) * (1 - Math.exp(-4 * dt));
     if (Math.abs(nextFov - camera.fov) > .01) { camera.fov = nextFov; camera.updateProjectionMatrix(); }
     cameraForward.set(Math.cos(heading), 0, Math.sin(heading));
@@ -211,6 +216,7 @@ function updateRaceUi() {
   if (!state) return;
   const me = state.racers.find(r => r.id === playerId) || state.racers.find(r => !r.isBot);
   const sorted = [...state.racers].sort(compareRacers);
+  itemUI.update(state,me);
   if (me) {
     $('#lapText').textContent = `TOUR ${Math.min(me.lap, state.lobby.laps)} / ${state.lobby.laps}`;
     $('#speedValue').textContent = Math.round(Math.abs(me.speed) * 3.6);
@@ -237,7 +243,7 @@ function finish() {
 function updateInput() {
   send('input', { input: {
     gas: !!(keys.w || keys.z || keys.arrowup), brake: !!(keys.s || keys.arrowdown),
-    left: !!(keys.a || keys.q || keys.arrowleft), right: !!(keys.d || keys.arrowright), drift: !!keys[' ']
+    left: !!(keys.q || keys.arrowleft), right: !!(keys.d || keys.arrowright), drift: !!keys[' ']
   } });
 }
 document.addEventListener('keydown', event => {
@@ -245,7 +251,9 @@ document.addEventListener('keydown', event => {
   const key = event.key.toLowerCase();
   if ([' ', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(key)) event.preventDefault();
   if (event.repeat || keys[key]) return;
-  keys[key] = true; updateInput();
+  keys[key] = true;
+  if(key==='a'){event.preventDefault();send('use_item');return;}
+  updateInput();
 });
 document.addEventListener('keyup', event => { if (race.classList.contains('hidden')) return; keys[event.key.toLowerCase()] = false; updateInput(); });
 addEventListener('blur', () => { keys = {}; updateInput(); });
@@ -272,7 +280,7 @@ async function launchRace() {
   } finally {portal.setBusy(false);if(failure)portal.error(failure);}
 }
 function stopRace() {
-  cancelAnimationFrame(raf); keys = {}; updateInput(); effects?.reset(); document.body.classList.remove('in-race');
+  cancelAnimationFrame(raf); keys = {}; updateInput(); effects?.reset(); itemUI.clear(); document.body.classList.remove('in-race');
 }
 function leaveRoom() {stopRace();send('leave_room');}
 function returnToGarage() {stopRace();leaveRoom();}
@@ -281,8 +289,9 @@ $('#startButton').onclick = returnToRoom;
 $('#garageRoomButton').onclick = returnToRoom;
 $('#backButton').onclick = leaveRoom;
 $('#againButton').onclick = returnToRoom;
+const itemUI=createItemsUI(()=>send('use_item'));
 portal = createPortal({
-  onView(page) {selection.setVisible(page==='garage');if(page!=='race')cancelAnimationFrame(raf);},
+  onView(page) {selection.setVisible(page==='garage');if(page!=='race'){cancelAnimationFrame(raf);itemUI.clear();}},
   onSignedIn(user) {selection.setChoices(user);connect();},
   onSignedOut() {const old=socket;socket=null;old?.close();currentRoom=null;playerId=null;stopRace();portal.setOnline(false);},
   onProfile(user) {selection.setProgression(user?.progression || null);updateFavorite();},

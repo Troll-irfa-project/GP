@@ -126,7 +126,7 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
   const distance = Math.max(1, Math.hypot(dx, dz));
   const angularSpeed = 2 * Math.max(4, r.speed) * Math.sin(error) / distance;
   let steer = Math.abs(error) > 1.1 ? Math.sign(error) : clamp(angularSpeed / steeringRate(chair, r.speed), -1, 1);
-  let speedLimit = topSpeed(chair) * (r.skill || 1) * (r.boost>0 ? 1.35 : 1);
+  let speedLimit = topSpeed(chair) * (r.skill || 1) * (r.boost>0 ? 1.35 : r.itemBoost>0 ? 1.2 : 1) * (r.slow>0 ? .8 : 1);
   // Brake BEFORE a vertex, using the available deceleration and turn radius.
   for (let i = 0; i < course.segments.length; i++) {
     const s = course.segments[i], next = course.segments[(i + 1) % course.segments.length];
@@ -170,15 +170,16 @@ function recoverBot(r, course, racers) {
   r.recoveryCount++; r.recoveryFlash = .8;
 }
 
-export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0) {
+export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0, afterMove = null) {
   const previous = new Map(racers.map(r => [r.id, { x: r.x, z: r.z }]));
   for (const r of racers) {
     if (r.finished) continue;
+    if(r.stun>0){r.speed=0;r.boost=0;r.itemBoost=0;continue;}
     const chair = chairs.find(c => c.id === r.chairId);
     const n = nearest(course, r.x, r.z, r.isBot ? r.lastAlong : null);
     const input = r.isBot ? botInput(r, chair, course, n, racers, dt) : r.input || {};
     const grip = n.distance <= course.width ? 1 : Math.min(1,Math.max(.35, chair.offroad / 10) * (r.upgradeId === 'module-grip' ? 1.02 : 1));
-    r.speed = driveSpeed(r.speed, input, chair, grip, r.boost, r.isBot ? r.skill || 1 : 1, dt, r.upgradeId);
+    r.speed = driveSpeed(r.speed, input, chair, grip, r.boost, r.isBot ? r.skill || 1 : 1, dt, r.upgradeId, r.itemBoost, r.slow);
     const steer = input.steer ?? ((input.right ? 1 : 0) - (input.left ? 1 : 0));
     r.steer += (clamp(steer, -1, 1) - r.steer) * Math.min(1, dt * 12);
     const drifting = Boolean(input.drift && Math.abs(r.steer) > .15 && r.speed > 9 && grip === 1);
@@ -230,5 +231,7 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0) {
       b.speed += closing * aw / total * (Math.cos(b.heading) * nx + Math.sin(b.heading) * nz);
     }
   }
+  for(const r of racers)if(r.stun>0){Object.assign(r,previous.get(r.id));r.speed=0;}
+  afterMove?.(previous);
   for (const r of racers) updateLapProgress(r, course, previous.get(r.id), dt, laps, raceTime);
 }

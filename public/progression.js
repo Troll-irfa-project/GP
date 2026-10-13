@@ -37,6 +37,14 @@ achievements.push(
   {id:'ultimate-master',name:'Maître de l’espace-temps',description:'Réussir les cinq objectifs de maîtrise ci-dessous. Débloque l’achat de Stephen Hawking.',goal:5,coins:800,xp:2000,
    requirements:[{metric:'eliteWins',goal:50,label:'Victoires en 200cc (nouvelles IA)'},{metric:'eliteCups',goal:10,label:'Tournois gagnés en 200cc (nouvelles IA)'},{metric:'eliteCircuits',goal:5,label:'Circuits gagnés en 200cc (nouvelles IA)'},{metric:'perfectCups',goal:3,label:'Grands chelems 150/200cc (nouvelles IA)'},{metric:'career',goal:4,label:'Catégories de carrière remportées'}]}
 );
+achievements.push(
+  {id:'items-winner',name:'Chaos maîtrisé',description:'Gagner 10 courses avec objets.',metric:'itemWins',goal:10,coins:120,xp:350},
+  {id:'pure-winner',name:'Tout au pilotage',description:'Gagner 10 courses sans objets depuis cette mise à jour.',metric:'pureWins',goal:10,coins:120,xp:350},
+  {id:'items-cup',name:'Coupe du chaos',description:'Remporter 3 tournois avec objets.',metric:'itemCups',goal:3,coins:180,xp:500},
+  {id:'pure-cup',name:'La ligne parfaite',description:'Remporter 3 tournois sans objets depuis cette mise à jour.',metric:'pureCups',goal:3,coins:180,xp:500},
+  {id:'box-collector',name:'Surprise sur surprise',description:'Ouvrir 100 boîtes mystères lors de courses terminées.',metric:'itemBoxes',goal:100,coins:100,xp:300},
+  {id:'item-marksman',name:'Trouble-fête',description:'Toucher 50 adversaires avec une échelle ou un revolver lors de courses terminées.',metric:'itemHits',goal:50,coins:150,xp:400}
+);
 export function achievementProgress(achievement,metrics) {
   return achievement.requirements ? achievement.requirements.filter(r=>(metrics[r.metric]||0)>=r.goal).length : metrics[achievement.metric]||0;
 }

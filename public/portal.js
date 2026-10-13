@@ -28,10 +28,10 @@ export function createPortal(callbacks) {
     if (user) {
       $('#profileRaces').textContent = user.racesFinished;
       $('#profileWins').textContent = user.racesWon;
-      $('#profileRecords').textContent = user.records.length;
+      $('#profileRecords').textContent = new Set(user.records.map(r=>r.trackId)).size;
       $('#profileFavorites').textContent = user.favoriteChairIds.length ? user.favoriteChairIds.map(id=>chairs.find(c=>c.id===id)?.name).join(' · ') : 'Aucun favori — ajoute une étoile dans le garage.';
       const format = ms => `${Math.floor(ms/60000)}:${(ms/1000%60).toFixed(3).padStart(6,'0')}`;
-      $('#personalRecords').innerHTML = user.records.length ? user.records.map(r=>`<div><strong>${escapeHtml(tracks.find(t=>t.id===r.trackId)?.name || r.trackId)}</strong><span>Course ${format(r.bestRaceMs)}${r.bestLapMs ? ` · Tour ${format(r.bestLapMs)}` : ''}</span></div>`).join('') : '<p>Termine une course pour inscrire ton premier chrono.</p>';
+      $('#personalRecords').innerHTML = user.records.length ? user.records.map(r=>`<div><strong>${escapeHtml(tracks.find(t=>t.id===r.trackId)?.name || r.trackId)}</strong><span>${r.itemsEnabled?'Avec objets':'Sans objets'} · Course ${format(r.bestRaceMs)}${r.bestLapMs ? ` · Tour ${format(r.bestLapMs)}` : ''}</span></div>`).join('') : '<p>Termine une course pour inscrire ton premier chrono.</p>';
     }
     progression.profile(user);
     competition.profile(user);

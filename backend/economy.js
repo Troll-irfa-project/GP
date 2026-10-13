@@ -43,6 +43,9 @@ export class Economy {
   metrics(id) {
     const user=this.db.prepare('SELECT races_finished AS races,races_won AS wins FROM users WHERE id=?').get(id);
     return {...user,
+      ...Object.fromEntries([['itemWins',1],['pureWins',0]].map(([key,enabled])=>[key,this.db.prepare('SELECT COUNT(*) AS n FROM race_results WHERE user_id=? AND place=1 AND items_enabled=? AND balance_version>=3').get(id,enabled).n])),
+      ...Object.fromEntries([['itemCups',1],['pureCups',0]].map(([key,enabled])=>[key,this.db.prepare('SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND items_enabled=? AND balance_version>=3').get(id,enabled).n])),
+      ...this.db.prepare('SELECT COALESCE(SUM(item_boxes),0) AS itemBoxes,COALESCE(SUM(item_uses),0) AS itemUses,COALESCE(SUM(item_hits),0) AS itemHits FROM race_results WHERE user_id=? AND items_enabled=1').get(id),
       winningCircuits:this.db.prepare('SELECT COUNT(DISTINCT track_id) AS n FROM race_results WHERE user_id=? AND place=1').get(id).n,
       podiums:this.db.prepare('SELECT COUNT(*) AS n FROM race_results WHERE user_id=? AND place<=3').get(id).n,
       expertWins:this.db.prepare("SELECT COUNT(*) AS n FROM race_results WHERE user_id=? AND place=1 AND difficulty IN ('150','200') AND balance_version>=2").get(id).n,
@@ -50,7 +53,7 @@ export class Economy {
       eliteCircuits:this.db.prepare("SELECT COUNT(DISTINCT track_id) AS n FROM race_results WHERE user_id=? AND place=1 AND difficulty='200' AND balance_version>=2").get(id).n,
       perfectCups:this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND place=1 AND won_races=5 AND difficulty IN ('150','200') AND balance_version>=2").get(id).n,
       eliteCups:this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND difficulty='200' AND balance_version>=2").get(id).n,
-      circuits:this.db.prepare('SELECT COUNT(*) AS n FROM records WHERE user_id=?').get(id).n,
+      circuits:this.db.prepare('SELECT COUNT(DISTINCT track_id) AS n FROM (SELECT track_id FROM records WHERE user_id=? UNION SELECT track_id FROM records_with_items WHERE user_id=?)').get(id,id).n,
       cups:this.db.prepare('SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND place=1 AND points>0').get(id).n,
       career150:this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND difficulty='150' AND place=1 AND points>0").get(id).n,
       career:this.db.prepare("SELECT COUNT(DISTINCT difficulty) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND place=1 AND points>0").get(id).n};
