@@ -1,4 +1,5 @@
 import { angleDelta, driveSpeed, steeringRate, topSpeed } from './motion.js';
+import { gridSlot } from './game-config.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
 const wrap = (value, length) => ((value % length) + length) % length;
@@ -39,14 +40,13 @@ export function nearest(course, x, z, around = null) {
 const pathDelta = (course, from, to) => wrap(to - from + course.total / 2, course.total) - course.total / 2;
 
 export function spawnRacer(r, i, course) {
-  const along = -4 - Math.floor(i / 2) * 3.5;
-  const lane = (i % 2 ? 1 : -1) * 1.5;
+  const {along,lane} = gridSlot(i);
   const p = pointAt(course, along, lane);
   Object.assign(r, {
     x: p.x, z: p.z, heading: Math.atan2(p.tz, p.tx), speed: 0, steer: 0,
     distance: along, progress: 0, lap: 1, lastAlong: wrap(along, course.total),
     finished: false, boost: 0, boostCooldown: 0, drift: 0, wasDrifting: false,
-    finishTime: null, completedLaps: 0, lapStarted: false, nextCheckpoint: 0, recoveryCount: 0, recoveryFlash: 0,
+    finishTime: null, completedLaps: 0, lapStarted: false, lapStartTime: null, bestLapTime: null, nextCheckpoint: 0, recoveryCount: 0, recoveryFlash: 0,
     ai: { lane, stuck: 0, bestDistance: along, safeAlong: wrap(along, course.total) }
   });
 }
@@ -70,6 +70,12 @@ export function updateLapProgress(r, course, before, dt, laps, raceTime) {
   const crossing = moved <= Math.max(5, Math.abs(r.speed) * dt * 3) ? gateCrossing(course.gates[r.nextCheckpoint], before, r) : null;
   if (crossing) {
     if (r.nextCheckpoint === 0) {
+      const crossingTime = raceTime - dt + crossing.fraction * dt;
+      if (r.lapStarted && r.lapStartTime !== null) {
+        const lapTime = crossingTime - r.lapStartTime;
+        if (lapTime > 0) r.bestLapTime = Math.min(r.bestLapTime ?? Infinity, lapTime);
+      }
+      r.lapStartTime = crossingTime;
       if (r.lapStarted) r.completedLaps++;
       else r.lapStarted = true; // Crossing from the grid starts, but never awards, lap 1.
       if (r.completedLaps >= laps) {

@@ -1,26 +1,24 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { startTestServer, signInPage, enterGarage, startRoomRace } from './helpers.js';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { treePlacements, distanceToRoute } from '../public/motion.js';
 
 test('browser: art-directed selection, pilots, smooth motion, camera and replay', { timeout: 120000 }, async () => {
   const port = 8099, url = `http://127.0.0.1:${port}`;
-  const server = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: String(port) }, stdio: 'pipe' });
+  const server = await startTestServer(port);
   let browser;
   try {
-    for (let i = 0; i < 100; i++) {
-      if (server.exitCode !== null) throw new Error('Test server failed to start');
-      try { if ((await fetch(url)).ok) break; } catch {}
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
+
     browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-swiftshader'] });
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     const errors = [];
     page.on('pageerror', error => { errors.push(error.message); console.error('Browser error:', error.message); });
     page.on('console', message => { if (message.type() === 'error' && /THREE|WebGL|shader|GLTF/i.test(message.text())) errors.push(message.text()); });
+    await signInPage(page,url);
     await page.goto(url);
+    await enterGarage(page);
     await page.locator('.pilot-card').first().waitFor();
     assert.equal(await page.locator('.chair-card').count(), 5);
     assert.equal(await page.locator('.pilot-card').count(), 7);
@@ -76,7 +74,7 @@ test('browser: art-directed selection, pilots, smooth motion, camera and replay'
         }
       };
     });
-    await page.locator('#startButton').click();
+    await startRoomRace(page);
     await page.waitForFunction(() => window.framesObserved.length > 20);
     await page.waitForFunction(() => document.querySelector('#countdown').textContent === '');
     await page.keyboard.down('w');
@@ -99,26 +97,26 @@ test('browser: art-directed selection, pilots, smooth motion, camera and replay'
     const frozenFraction = deltas.filter(d => d < .00001).length / deltas.length;
     assert.ok(frozenFraction < .2, `interpolation must move between snapshots; frozen fraction ${frozenFraction}`);
     await page.locator('#backButton').click();
+    await enterGarage(page);
     await page.locator('#chairTab').click();
     await page.locator('[data-chair="trail"]').click();
     await page.locator('#continueButton').click();
-    await page.locator('#startButton').click();
+    await startRoomRace(page);
     await page.waitForFunction(() => window.framesObserved.at(-1)?.playerModel === 'trail');
     await page.locator('#game').screenshot({ path: 'test-results/race-trail.png' });
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ frames: frames.length, geometryCount: frames.at(-1).geometries, drawCalls: frames.at(-1).calls, frozenFraction, models: frames.at(-1).models }));
     // Validate scenery clearance on the five actual server routes.
-    const catalog = await page.evaluate(async () => new Promise(resolve => {
-      const ws = new WebSocket(`ws://${location.host}`);
-      ws.onmessage = event => { const m = JSON.parse(event.data); if (m.type === 'hello') { ws.close(); resolve(m); } };
-    }));
+    const catalog = await page.evaluate(async () => {const {tracks,pilots}=await import('/catalog.js');return {tracks,pilots};});
     for (const track of catalog.tracks) for (const tree of treePlacements(track.route)) {
       assert.ok(distanceToRoute(tree.x, tree.z, track.route) >= 8.6 + tree.radius + 2);
     }
     assert.equal(catalog.pilots.length, 7);
     const mobile = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
     mobile.on('pageerror', error => errors.push(error.message));
+    await signInPage(mobile,url);
     await mobile.goto(url);
+    await enterGarage(mobile,'room-2');
     await mobile.locator('.pilot-card').first().waitFor();
     await mobile.evaluate(() => document.fonts.ready);
     assert.equal(await mobile.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'mobile menu does not overflow');
@@ -131,6 +129,6 @@ test('browser: art-directed selection, pilots, smooth motion, camera and replay'
     await mobile.screenshot({ path: 'test-results/selection-circuit-mobile.png', fullPage: true });
     assert.deepEqual(errors, []);
   } finally {
-    await browser?.close(); server.kill();
+    await browser?.close(); await server.close();
   }
 });

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { startTestServer, signInPage, enterGarage, startRoomRace } from './helpers.js';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from '@playwright/test';
 import { distanceToRoute } from '../public/motion.js';
@@ -9,15 +9,17 @@ import { createCourse } from '../public/racing.js';
 
 test('five 3D themes, drift particles, turbo and bounded rendering resources', { timeout: 120000 }, async () => {
   const port = 8102, url = `http://127.0.0.1:${port}`;
-  const server = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: String(port) }, stdio: 'pipe' });
+  const server = await startTestServer(port);
   let browser;
   try {
-    for (let i = 0; i < 100; i++) { try { if ((await fetch(url)).ok) break; } catch {} await new Promise(resolve => setTimeout(resolve, 30)); }
+
     browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-swiftshader'] });
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } }), errors = [], results = [];
     page.on('pageerror', e => errors.push(e.message));
     page.on('console', message => { if (message.type() === 'error' && /THREE|WebGL|shader|GLTF/i.test(message.text())) errors.push(message.text()); });
-    await page.goto(url); await page.locator('.pilot-card').first().waitFor();
+    await signInPage(page,url);
+    await page.goto(url);
+    await enterGarage(page); await page.locator('.pilot-card').first().waitFor();
     await page.evaluate(async () => {
       const THREE = await import('/three.js'); window.renderHistory = [];
       THREE.Scene.prototype.onAfterRender = function(renderer, scene) {
@@ -33,10 +35,10 @@ test('five 3D themes, drift particles, turbo and bounded rendering resources', {
     });
     await mkdir('test-results', { recursive: true });
     for (const track of ['coast', 'neon', 'metro', 'garden', 'orbit', 'coast']) {
-      if (await page.locator('#backButton').isVisible()) await page.locator('#backButton').click();
+      if (await page.locator('#backButton').isVisible()) {await page.locator('#backButton').click();await enterGarage(page);}
       await page.locator('#circuitStep').click(); await page.locator(`[data-track="${track}"]`).click();
       await page.evaluate(() => { window.lastRender = null; window.renderHistory = []; });
-      await page.locator('#startButton').click();
+      await startRoomRace(page);
       await page.waitForFunction(id => window.lastRender?.track === id && document.querySelector('#countdown').textContent === '', track);
       await page.keyboard.down('w'); await page.waitForTimeout(3100); await page.keyboard.up('w');
       await page.screenshot({ path: `test-results/race-${track}-art.png` });
@@ -64,5 +66,5 @@ test('five 3D themes, drift particles, turbo and bounded rendering resources', {
     assert.ok(animation.some(r => r.drift > .2 && r.particles > 0), 'charged drift emits sparks');
     assert.deepEqual(errors, []);
     console.log(JSON.stringify({ renderingThemes: results }));
-  } finally { await browser?.close(); server.kill(); }
+  } finally { await browser?.close(); await server.close(); }
 });

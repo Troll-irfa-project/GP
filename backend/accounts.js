@@ -1,0 +1,123 @@
+import { DatabaseSync } from 'node:sqlite';
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
+import { randomBytes, randomUUID, scrypt, timingSafeEqual, createHash } from 'node:crypto';
+import { promisify } from 'node:util';
+
+const derive = promisify(scrypt), SESSION_SECONDS = 7 * 24 * 3600;
+const SCRYPT = { N: 131072, r: 8, p: 1, maxmem: 192 * 1024 * 1024 };
+const tokenHash = token => createHash('sha256').update(token).digest('hex');
+export class HttpError extends Error {
+  constructor(status, message) { super(message); this.status = status; }
+}
+export function usernameKey(value) { return String(value ?? '').normalize('NFKC').trim().toLowerCase(); }
+
+export class Accounts {
+  constructor(filename) {
+    if (filename !== ':memory:') mkdirSync(dirname(filename), { recursive: true });
+    this.db = new DatabaseSync(filename); this.hashing = 0;
+    this.db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;
+      CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY, username TEXT NOT NULL, username_key TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL, created_at INTEGER NOT NULL,
+        chair_id TEXT NOT NULL DEFAULT 'comet', pilot_id TEXT NOT NULL DEFAULT 'hawking',
+        favorites TEXT NOT NULL DEFAULT '[]', races_finished INTEGER NOT NULL DEFAULT 0,
+        races_won INTEGER NOT NULL DEFAULT 0, championships TEXT NOT NULL DEFAULT '[]'
+      );
+      CREATE TABLE IF NOT EXISTS sessions (
+        token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        expires_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS session_expiry ON sessions(expires_at);
+      CREATE TABLE IF NOT EXISTS records (
+        user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, track_id TEXT NOT NULL,
+        best_race_ms INTEGER NOT NULL, best_lap_ms INTEGER, PRIMARY KEY(user_id, track_id)
+      );
+      CREATE TABLE IF NOT EXISTS race_results (
+        race_id TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        track_id TEXT NOT NULL, time_ms INTEGER NOT NULL, place INTEGER NOT NULL, created_at INTEGER NOT NULL,
+        PRIMARY KEY(race_id, user_id)
+      ); PRAGMA user_version=1;`);
+    this.prune();
+  }
+  prune() { this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now()); }
+  async hash(password, salt = randomBytes(16).toString('hex')) {
+    // Bound memory use even if many login requests arrive at once.
+    if (this.hashing >= 2) throw new HttpError(503, 'Connexion occupée. Réessaie dans quelques secondes.');
+    this.hashing++;
+    try { return `scrypt$${salt}$${(await derive(password, salt, 64, SCRYPT)).toString('hex')}`; }
+    finally { this.hashing--; }
+  }
+  async register(username, password) {
+    const display = typeof username === 'string' ? username.normalize('NFKC').trim() : '';
+    if (!/^[\p{L}\p{N}_-]{3,20}$/u.test(display)) throw new HttpError(400, 'Pseudo : 3 à 20 lettres, chiffres, tirets ou underscores.');
+    if (typeof password !== 'string' || password.length < 8 || password.length > 128) throw new HttpError(400, 'Mot de passe : entre 8 et 128 caractères.');
+    const key = usernameKey(display);
+    if (this.db.prepare('SELECT id FROM users WHERE username_key=?').get(key)) throw new HttpError(409, 'Ce pseudo est déjà utilisé.');
+    const hash = await this.hash(password), id = randomUUID();
+    try { this.db.prepare('INSERT INTO users(id,username,username_key,password_hash,created_at) VALUES(?,?,?,?,?)').run(id, display, key, hash, Date.now()); }
+    catch (error) {
+      if (this.db.prepare('SELECT id FROM users WHERE username_key=?').get(key)) throw new HttpError(409, 'Ce pseudo est déjà utilisé.');
+      throw error;
+    }
+    return this.profile(id);
+  }
+  async login(username, password) {
+    if (typeof password !== 'string' || password.length > 128 || typeof username !== 'string' || username.length > 100) throw new HttpError(401, 'Pseudo ou mot de passe incorrect.');
+    const row = this.db.prepare('SELECT id,password_hash FROM users WHERE username_key=?').get(usernameKey(username));
+    // Unknown accounts take the same expensive hashing path as wrong passwords.
+    const stored = row?.password_hash || `scrypt$${'0'.repeat(32)}$${'0'.repeat(128)}`;
+    const [, salt, expected] = stored.split('$');
+    const actual = (await this.hash(password, salt)).split('$')[2];
+    if (!timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(actual, 'hex')) || !row) throw new HttpError(401, 'Pseudo ou mot de passe incorrect.');
+    return this.profile(row.id);
+  }
+  profile(id) {
+    const row = this.db.prepare('SELECT id,username,chair_id,pilot_id,favorites,races_finished,races_won,championships FROM users WHERE id=?').get(id);
+    if (!row) return null;
+    return { id: row.id, username: row.username, chairId: row.chair_id, pilotId: row.pilot_id,
+      favoriteChairIds: JSON.parse(row.favorites), racesFinished: row.races_finished, racesWon: row.races_won,
+      championships: JSON.parse(row.championships),
+      records: this.db.prepare('SELECT track_id AS trackId,best_race_ms AS bestRaceMs,best_lap_ms AS bestLapMs FROM records WHERE user_id=? ORDER BY track_id').all(id) };
+  }
+  preferences(id, { chairId, pilotId, favoriteChairIds } = {}) {
+    const profile = this.profile(id);
+    this.db.prepare('UPDATE users SET chair_id=?,pilot_id=?,favorites=? WHERE id=?').run(chairId ?? profile.chairId, pilotId ?? profile.pilotId, JSON.stringify(favoriteChairIds ?? profile.favoriteChairIds), id);
+    return this.profile(id);
+  }
+  createSession(id) {
+    const token = randomBytes(32).toString('base64url');
+    this.db.prepare('INSERT INTO sessions(token_hash,user_id,expires_at) VALUES(?,?,?)').run(tokenHash(token), id, Date.now() + SESSION_SECONDS * 1000);
+    return token;
+  }
+  session(token) {
+    if (!token || !/^[A-Za-z0-9_-]{43}$/.test(token)) return null;
+    const hash = tokenHash(token), row = this.db.prepare('SELECT user_id FROM sessions WHERE token_hash=? AND expires_at>?').get(hash, Date.now());
+    return row ? { hash, user: this.profile(row.user_id) } : null;
+  }
+  sessionValid(hash) { return Boolean(this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND expires_at>?').get(hash, Date.now())); }
+  revoke(token) { if (token) this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(token)); }
+  recordResult({ raceId, userId, trackId, time, bestLap, place }) {
+    const timeMs = Math.round(time * 1000), lapMs = Number.isFinite(bestLap) ? Math.round(bestLap * 1000) : null;
+    if (!Number.isFinite(timeMs) || timeMs <= 0) return;
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      const inserted = this.db.prepare('INSERT OR IGNORE INTO race_results VALUES(?,?,?,?,?,?)').run(raceId, userId, trackId, timeMs, place, Date.now());
+      if (inserted.changes) {
+        this.db.prepare('UPDATE users SET races_finished=races_finished+1,races_won=races_won+? WHERE id=?').run(place === 1 ? 1 : 0, userId);
+        this.db.prepare(`INSERT INTO records VALUES(?,?,?,?) ON CONFLICT(user_id,track_id) DO UPDATE SET
+          best_race_ms=MIN(best_race_ms,excluded.best_race_ms),
+          best_lap_ms=CASE WHEN best_lap_ms IS NULL THEN excluded.best_lap_ms WHEN excluded.best_lap_ms IS NULL THEN best_lap_ms ELSE MIN(best_lap_ms,excluded.best_lap_ms) END`).run(userId, trackId, timeMs, lapMs);
+      }
+      this.db.exec('COMMIT');
+    } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+  close() { this.db.close(); }
+}
+
+export function sessionCookie(token, secure = false) {
+  return `rollrush_session=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${token ? SESSION_SECONDS : 0}${secure ? '; Secure' : ''}`;
+}
+export function readSessionCookie(req) {
+  return (req.headers.cookie || '').split(';').map(s => s.trim()).find(s => s.startsWith('rollrush_session='))?.slice('rollrush_session='.length) || '';
+}

@@ -1,0 +1,62 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { chromium } from '@playwright/test';
+import { mkdir } from 'node:fs/promises';
+import { startTestServer, signInPage, TEST_PASSWORD } from './helpers.js';
+
+test('real browsers: registration, login, favorites, room host transfer and synchronized 12-player race', {timeout:120000}, async()=>{
+  const server=await startTestServer(8114);let browser;
+  try {
+    browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-unsafe-swiftshader']});
+    const a=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
+    a.on('pageerror',e=>errors.push(e.message));
+    await a.goto(server.url);await a.locator('#authScreen').waitFor();await a.evaluate(()=>document.fonts.ready);
+    await mkdir('test-results',{recursive:true});await a.screenshot({path:'test-results/auth-desktop.png'});
+    await a.locator('#registerTab').click();await a.locator('#authUsername').fill('AliceBrowser');await a.locator('#authPassword').fill(TEST_PASSWORD);await a.locator('#authSubmit').click();
+    await a.locator('[data-room="room-1"]').waitFor();assert.equal(await a.locator('.room-card').count(),3);
+    await a.screenshot({path:'test-results/rooms-desktop.png'});
+    await a.locator('[data-room="room-1"]').click();await a.locator('#roomLobby').waitFor();
+    assert.equal(await a.locator('#roomRoster .room-seat').count(),12);
+    assert.equal(await a.locator('#roomRoster .bot').count(),11);
+    assert.equal(await a.locator('#roomHost').textContent(),'AliceBrowser');assert.equal(await a.locator('#launchRace').isEnabled(),true);
+    await a.locator('#roomGarageButton').click();await a.locator('#chairTab').click();await a.locator('[data-chair="drift"]').click();await a.locator('#favoriteChair').click();
+    await a.waitForFunction(()=>document.querySelector('#favoriteChair').getAttribute('aria-pressed')==='true');
+    await a.locator('#circuitStep').click();await a.locator('[data-track="garden"]').click();await a.locator('#startButton').click();
+    await a.waitForFunction(()=>document.querySelector('#roomCircuit').textContent==='Jardin Turbo');
+    const b=await browser.newPage({viewport:{width:1280,height:850}});b.on('pageerror',e=>errors.push(e.message));
+    const second=await signInPage(b,server.url);await b.goto(server.url);await b.locator('[data-room="room-1"]').click();await b.locator('#roomLobby').waitFor();
+    await a.waitForFunction(()=>document.querySelectorAll('#roomRoster .bot').length===10);
+    assert.equal(await b.locator('#launchRace').isDisabled(),true);
+    await b.locator('#roomGarageButton').click();await b.locator('#circuitStep').click();assert.equal(await b.locator('[data-track="coast"]').isDisabled(),true);await b.locator('#startButton').click();
+    await a.screenshot({path:'test-results/room-waiting.png'});
+    // Oldest remaining member becomes host without any other player's intervention.
+    await a.locator('#leaveRoomButton').click();
+    await b.waitForFunction(name=>document.querySelector('#roomHost').textContent===name,second.username);
+    assert.equal(await b.locator('#launchRace').isEnabled(),true);
+    await a.locator('[data-room="room-1"]').click();await a.locator('#roomLobby').waitFor();
+    assert.equal(await a.locator('#launchRace').isDisabled(),true);
+    await b.locator('#launchRace').click();await a.locator('#game').waitFor();await b.locator('#game').waitFor();
+    await a.waitForFunction(()=>document.querySelector('#countdown').textContent===''&&document.querySelector('#raceMapDots').children.length===12);
+    await b.waitForFunction(()=>document.querySelector('#countdown').textContent===''&&document.querySelector('#raceMapDots').children.length===12);
+    await a.keyboard.down('w');await b.keyboard.down('w');await a.waitForTimeout(2100);await a.keyboard.up('w');await b.keyboard.up('w');
+    assert.ok(Number(await a.locator('#speedValue').textContent())>10);assert.ok(Number(await b.locator('#speedValue').textContent())>10);
+    await a.screenshot({path:'test-results/twelve-player-race.png'});
+    await b.locator('#backButton').click();await b.locator('#roomBrowser').waitFor();
+    assert.equal(await a.locator('#game').isVisible(),true,'host departure must not interrupt another human racing');
+    await a.waitForTimeout(350);assert.equal(await a.locator('#ranking .rank').count(),12);
+    await a.locator('#backButton').click();await a.locator('#logoutButton').click();await a.locator('#authScreen').waitFor();
+    await a.locator('#authUsername').fill('AliceBrowser');await a.locator('#authPassword').fill('bad password');await a.locator('#authSubmit').click();
+    await a.waitForFunction(()=>document.querySelector('#authStatus').textContent.includes('incorrect'));
+    await a.locator('#authPassword').fill(TEST_PASSWORD);await a.locator('#authSubmit').click();await a.locator('#roomBrowser').waitFor();
+    await a.locator('.profile-strip summary').click();assert.match(await a.locator('#profileFavorites').textContent(),/Drift/);
+    await a.reload();await a.locator('#roomBrowser').waitFor();assert.equal(await a.locator('#accountName').textContent(),'AliceBrowser');
+    const mobile=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});mobile.on('pageerror',e=>errors.push(e.message));
+    await mobile.goto(server.url);await mobile.locator('#authScreen').waitFor();await mobile.screenshot({path:'test-results/auth-mobile.png',fullPage:true});
+    assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await signInPage(mobile,server.url);await mobile.reload();await mobile.locator('#roomBrowser').waitFor();await mobile.screenshot({path:'test-results/rooms-mobile.png',fullPage:true});
+    assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    await mobile.locator('[data-room="room-3"]').click();await mobile.locator('#roomLobby').waitFor();await mobile.screenshot({path:'test-results/room-mobile.png',fullPage:true});
+    assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    assert.deepEqual(errors,[]);
+  } finally {await browser?.close();await server.close();}
+});

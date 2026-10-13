@@ -1,28 +1,146 @@
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
+import { extname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WebSocketServer } from 'ws';
+import { Accounts, HttpError, readSessionCookie, sessionCookie, usernameKey } from './backend/accounts.js';
+import { RoomManager } from './backend/rooms.js';
 import { chairs, tracks, pilots } from './public/catalog.js';
-import { createCourse, spawnRacer, stepRace } from './public/racing.js';
+import { MAX_RACERS } from './public/game-config.js';
 
-const root=fileURLToPath(new URL('.',import.meta.url)),PORT=process.env.PORT||8080,PHYSICS_DT=1/60,NETWORK_DT=1/15;
-const courses = new Map(tracks.map(track => [track.id, createCourse(track)]));
-const clients=new Map();let nextId=1,racers=[],lobby={trackId:'coast',laps:3,started:false,countdown:0,raceTime:0,winner:null,raceId:0};
-const track=()=>tracks.find(t=>t.id===lobby.trackId)||tracks[0],chair=id=>chairs.find(c=>c.id===id)||chairs[0];
-function spawn(r, i) { spawnRacer(r, i, courses.get(lobby.trackId)); }
-function bot(i){const c=chairs[i%chairs.length];return{id:`bot-${nextId++}`,name:['Pixel','Nova','Axel','Moxie','Kiro'][i-1]||`Bot ${i}`,chairId:c.id,pilotId:pilots[i%pilots.length].id,isBot:true,x:0,z:0,heading:0,speed:0,progress:0,lap:1,lastAlong:0,finished:false,boost:0,drift:0,wasDrifting:false,skill:.88+Math.random()*.12}}
-function fillBots(){while(racers.length<6)racers.push(bot(racers.length))}
-function reset(){lobby.raceId++;lobby.started=false;lobby.countdown=0;lobby.raceTime=0;lobby.winner=null;racers.forEach((r,i)=>spawn(r,i))}
-// Static meshes/routes/catalogs are sent once in hello, never at the 15 Hz race rate.
-function state(){return JSON.stringify({type:'state',lobby,racers,serverTime:Date.now()})}
-function broadcast(){const m=state();for(const ws of clients.keys())if(ws.readyState===1)ws.send(m)}
-function input(ws,msg){let d;try{d=JSON.parse(msg)}catch{return}const p=clients.get(ws);if(d.type==='join'){if(p)return;if(racers.length>=6){const botIndex=racers.findIndex(r=>r.isBot);if(botIndex<0){ws.send(JSON.stringify({type:'error',message:'La grille est complète : 6 joueurs sont déjà connectés.'}));return;}racers.splice(botIndex,1)}if(tracks.some(t=>t.id===d.trackId))lobby.trackId=d.trackId;const r={id:`p-${nextId++}`,name:String(d.name||'Pilote').slice(0,16),chairId:chair(d.chairId).id,pilotId:(pilots.find(p=>p.id===d.pilotId)||pilots[0]).id,isBot:false,x:0,z:0,heading:0,speed:0,progress:0,lap:1,lastAlong:0,finished:false,boost:0,drift:0,wasDrifting:false,input:{gas:false,brake:false,left:false,right:false,drift:false}};clients.set(ws,r);ws.send(JSON.stringify({type:'joined',playerId:r.id}));racers.push(r);fillBots();reset();broadcast();return}if(!p)return;if(d.type==='input')p.input={...p.input,...d.input};if(d.type==='configure'&&!lobby.started){if(tracks.some(t=>t.id===d.trackId))lobby.trackId=d.trackId;p.chairId=chair(d.chairId).id;p.pilotId=(pilots.find(p=>p.id===d.pilotId)||pilots[0]).id;if(d.name)p.name=String(d.name).slice(0,16);reset();broadcast()}if(d.type==='start'&&!lobby.started&&!lobby.countdown&&racers.length){const raceId=lobby.raceId;lobby.countdown=3;broadcast();setTimeout(()=>{if(lobby.raceId!==raceId)return;lobby.countdown=2;broadcast()},650);setTimeout(()=>{if(lobby.raceId!==raceId)return;lobby.countdown=1;broadcast()},1300);setTimeout(()=>{if(lobby.raceId!==raceId)return;lobby.countdown=0;lobby.started=true;broadcast()},1950)}if(d.type==='restart'){reset();broadcast()}}
-function update() {
-  if (!lobby.started) return;
-  lobby.raceTime += PHYSICS_DT;
-  stepRace(racers, courses.get(lobby.trackId), chairs, PHYSICS_DT, lobby.laps, lobby.raceTime);
-  const winner = racers.filter(r => r.finished).sort((a, b) => a.finishTime - b.finishTime)[0];
-  if (winner) lobby.winner = winner.name;
+const root = fileURLToPath(new URL('.', import.meta.url)), PORT = Number(process.env.PORT || 8080);
+const accounts = new Accounts(process.env.DB_PATH || join(root,'data','rollrush.sqlite'));
+const roomCount = Math.max(1,Math.min(20,Number.parseInt(process.env.ROOM_COUNT || '3',10) || 3));
+const rooms = new RoomManager(accounts,roomCount), connections = new Map(), usersOnline = new Map();
+const attempts = new Map();
+const publicRoot = resolve(root,'public');
+const mime = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.glb':'model/gltf-binary','.ttf':'font/ttf','.json':'application/json; charset=utf-8'};
+
+function trustedOrigin(req, optional = false) {
+  const expected = process.env.APP_ORIGIN || `${req.socket.encrypted ? 'https' : 'http'}://${req.headers.host}`;
+  if (!req.headers.origin) return optional;
+  try { return new URL(req.headers.origin).origin === new URL(expected).origin; } catch { return false; }
 }
-const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.glb':'model/gltf-binary','.ttf':'font/ttf','.json':'application/json; charset=utf-8'};const http=createServer(async(req,res)=>{const pathname=new URL(req.url,'http://localhost').pathname;const p=pathname==='/'?'/index.html':pathname;try{const file=p==='/three.js'?join(root,'node_modules','three','build','three.module.js'):join(root,'public',p);const body=await readFile(file);res.writeHead(200,{'Content-Type':p==='/three.js'?'text/javascript; charset=utf-8':mime[extname(p)]||'application/octet-stream'});res.end(body)}catch{res.writeHead(404);res.end('Not found')}});const wss=new WebSocketServer({server:http});wss.on('connection',ws=>{ws.send(JSON.stringify({type:'hello',chairs,tracks,pilots}));ws.on('message',m=>input(ws,m.toString()));ws.on('close',()=>{const p=clients.get(ws);if(p){racers=racers.filter(r=>r.id!==p.id);clients.delete(ws);fillBots();reset();broadcast()}})});setInterval(update,PHYSICS_DT*1000);setInterval(()=>{if(lobby.started)broadcast()},NETWORK_DT*1000);http.listen(PORT,()=>console.log(`Roll Rush Arena listening on http://localhost:${PORT}`));
+function json(res, status, data, headers = {}) {
+  res.writeHead(status,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store',...headers});
+  res.end(JSON.stringify(data));
+}
+async function body(req) {
+  if (!(req.headers['content-type'] || '').toLowerCase().startsWith('application/json')) throw new HttpError(415,'Un corps JSON est requis.');
+  let size=0, chunks=[];
+  for await (const chunk of req) {
+    size+=chunk.length;
+    if(size>8192) throw new HttpError(413,'Requête trop volumineuse.');
+    chunks.push(chunk);
+  }
+  try {
+    const value=JSON.parse(Buffer.concat(chunks).toString('utf8'));
+    if(!value || typeof value!=='object' || Array.isArray(value)) throw new Error();
+    return value;
+  } catch { throw new HttpError(400,'Requête JSON invalide.'); }
+}
+function limited(key, max, windowMs) {
+  const now=Date.now();
+  let entry=attempts.get(key);
+  if(!entry || entry.until<=now) { entry={count:0,until:now+windowMs}; attempts.set(key,entry); }
+  entry.count++;
+  if(entry.count>max) throw new HttpError(429,'Trop de tentatives. Réessaie dans quelques minutes.');
+}
+function requireSession(req) {
+  const session=accounts.session(readSessionCookie(req));
+  if(!session) throw new HttpError(401,'Connecte-toi pour continuer.');
+  return session;
+}
+async function api(req,res,path) {
+  if(req.method==='GET' && path==='/api/me') return json(res,200,{user:accounts.session(readSessionCookie(req))?.user || null});
+  if(req.method==='GET' && path==='/api/rooms') {requireSession(req);return json(res,200,{rooms:rooms.list()});}
+  if(req.method!=='POST') throw new HttpError(405,'Méthode non autorisée.');
+  if(!trustedOrigin(req)) throw new HttpError(403,'Origine non autorisée.');
+  const data=await body(req);
+  if(path==='/api/register' || path==='/api/login') {
+    limited('ip:'+req.socket.remoteAddress,30,10*60*1000);
+    const key='login:'+usernameKey(data.username).slice(0,100);
+    if(path==='/api/login') limited(key,10,15*60*1000);
+    const user=path==='/api/register' ? await accounts.register(data.username,data.password) : await accounts.login(data.username,data.password);
+    attempts.delete(key);
+    // Rotate the cookie on every authentication; no token is exposed to JavaScript.
+    accounts.revoke(readSessionCookie(req));
+    const token=accounts.createSession(user.id), secure=process.env.COOKIE_SECURE==='true' || Boolean(req.socket.encrypted);
+    return json(res,path==='/api/register'?201:200,{user},{'Set-Cookie':sessionCookie(token,secure)});
+  }
+  const session=requireSession(req);
+  if(path==='/api/logout') {
+    accounts.revoke(readSessionCookie(req));
+    for(const [ws,client] of connections) if(client.sessionHash===session.hash) {rooms.remove(client);ws.close(4001,'Déconnexion');}
+    return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',process.env.COOKIE_SECURE==='true')});
+  }
+  if(path==='/api/profile') {
+    const keys=Object.keys(data);
+    if(keys.some(k=>!['favoriteChairIds'].includes(k)) || !Array.isArray(data.favoriteChairIds) || data.favoriteChairIds.length>5 || data.favoriteChairIds.some(id=>!chairs.some(c=>c.id===id))) throw new HttpError(400,'Préférences invalides.');
+    const user=accounts.preferences(session.user.id,{favoriteChairIds:[...new Set(data.favoriteChairIds)]});
+    for(const client of connections.values()) if(client.user.id===user.id) rooms.send(client,'profile',{user});
+    return json(res,200,{user});
+  }
+  throw new HttpError(404,'Route introuvable.');
+}
+const http=createServer(async(req,res)=>{
+  res.setHeader('X-Content-Type-Options','nosniff');res.setHeader('Referrer-Policy','same-origin');
+  try {
+    const pathname=new URL(req.url,'http://localhost').pathname;
+    if(pathname.startsWith('/api/')) return await api(req,res,pathname);
+    if(!['GET','HEAD'].includes(req.method)) throw new HttpError(405,'Méthode non autorisée.');
+    const path=decodeURIComponent(pathname==='/'?'/index.html':pathname);
+    const file=path==='/three.js' ? join(root,'node_modules','three','build','three.module.js') : resolve(publicRoot,'.'+path);
+    if(path!=='/three.js' && (!file.startsWith(publicRoot+sep) || !mime[extname(file)])) throw new HttpError(404,'Fichier introuvable.');
+    const contents=await readFile(file);
+    res.writeHead(200,{'Content-Type':mime[extname(file)] || 'application/octet-stream','Cache-Control':'no-cache'});
+    res.end(req.method==='HEAD'?undefined:contents);
+  } catch(error) {
+    const status=error.status || (error.code==='ENOENT' || error instanceof URIError ? 404 : 500);
+    if(status===500) console.error('Request failed:',error.message);
+    if(!res.headersSent) json(res,status,{error:status===500?'Erreur du serveur.':error.status?error.message:'Fichier introuvable.'});
+    else res.end();
+  }
+});
+const wss=new WebSocketServer({noServer:true,maxPayload:4096});
+http.on('upgrade',(req,socket,head)=>{
+  const reject=status=>{socket.write(`HTTP/1.1 ${status}\r\nConnection: close\r\n\r\n`);socket.destroy();};
+  if(!trustedOrigin(req,true)) return reject('403 Forbidden');
+  const session=accounts.session(readSessionCookie(req));
+  if(!session) return reject('401 Unauthorized');
+  if(req.url!=='/ws') return reject('404 Not Found');
+  wss.handleUpgrade(req,socket,head,ws=>wss.emit('connection',ws,session));
+});
+wss.on('connection',(ws,session)=>{
+  const client={ws,user:session.user,sessionHash:session.hash,roomId:null,racer:null,messages:0,window:Date.now(),alive:true};
+  // A single account cannot occupy multiple seats or control multiple racers.
+  if(usersOnline.has(session.user.id)) {ws.close(4009,'Ce compte est déjà connecté dans un autre onglet.');return;}
+  connections.set(ws,client);usersOnline.set(session.user.id,ws);
+  rooms.send(client,'hello',{chairs,tracks,pilots,user:session.user,capacity:MAX_RACERS});
+  rooms.add(client);
+  ws.on('pong',()=>{client.alive=true;});
+  ws.on('message',raw=>{
+    if(!accounts.sessionValid(client.sessionHash)) {rooms.remove(client);ws.close(4001,'Session expirée');return;}
+    if(Date.now()-client.window>1000) {client.window=Date.now();client.messages=0;}
+    if(++client.messages>60) {ws.close(4008,'Trop de messages');return;}
+    let data;try{data=JSON.parse(raw.toString());}catch{return rooms.error(client,'Message invalide.');}
+    try {rooms.handle(client,data);}catch(error){console.error('Room request failed:',error.message);rooms.error(client,'Action impossible. Réessaie.');}
+  });
+  ws.on('error',()=>{}); // Close performs cleanup, without logging session material.
+  ws.on('close',()=>{
+    rooms.remove(client);connections.delete(ws);
+    if(usersOnline.get(client.user.id)===ws) usersOnline.delete(client.user.id);
+  });
+});
+setInterval(()=>rooms.tick(1/60),1000/60);
+setInterval(()=>rooms.publish(),1000/15);
+setInterval(()=>{
+  accounts.prune();
+  for(const [key,entry] of attempts) if(entry.until<Date.now()) attempts.delete(key);
+  for(const [ws,client] of connections) {
+    if(!accounts.sessionValid(client.sessionHash)) {rooms.remove(client);ws.close(4001,'Session expirée');continue;}
+    if(!client.alive) {ws.terminate();continue;}
+    client.alive=false;ws.ping();
+  }
+},30000).unref();
+http.listen(PORT,()=>console.log(`Roll Rush listening on http://localhost:${PORT} · ${roomCount} rooms · ${MAX_RACERS} racers`));

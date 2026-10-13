@@ -1,6 +1,7 @@
 import { chairs, pilots, tracks } from './catalog.js';
 import { silhouettes } from './chairs.js';
 import { createGarage } from './garage.js';
+import { MAX_RACERS } from './game-config.js';
 
 const $ = selector => document.querySelector(selector);
 const stats = [['Vitesse max.', 'speed'], ['Accélération', 'accel'], ['Maniabilité', 'handling'], ['Hors-piste', 'offroad'], ['Poids / impact', 'weight']];
@@ -16,7 +17,7 @@ const pad = n => String(n).padStart(2, '0');
 
 export function createSelection(onChange) {
   let screen = 'pilot', chairId = 'comet', pilotId = 'hawking', trackId = 'coast', garage, ready = false, visible = true;
-  let populated = false, rosterSignature = '';
+  let populated = false, rosterSignature = '', trackLocked = false;
   const choices = () => ({ chairId, pilotId, trackId });
   const listFor = () => screen === 'pilot' ? pilots : screen === 'chair' ? chairs : orderedTracks;
   const idFor = () => screen === 'pilot' ? pilotId : screen === 'chair' ? chairId : trackId;
@@ -24,7 +25,7 @@ export function createSelection(onChange) {
     if (populated) return; populated = true;
     $('#pilots').innerHTML = pilots.map(p => `<button class="pilot-card" data-pilot="${p.id}" aria-label="Choisir ${p.name}" aria-pressed="false"><span class="portrait" style="background-position:${p.portrait % 4 * 100 / 3}% ${Math.floor(p.portrait / 4) * 100}%"></span><span class="card-name">${p.name}</span></button>`).join('');
     $('#chairs').innerHTML = chairs.map(c => `<button class="chair-card" data-chair="${c.id}" aria-label="Choisir le fauteuil ${c.name}" aria-pressed="false"><img alt="" width="320" height="180"/><span class="card-name">${c.name}<small>${c.tag.toUpperCase()} · 35 POINTS</small></span></button>`).join('');
-    $('#tracks').innerHTML = orderedTracks.map(t => `<button class="track-card" data-track="${t.id}" aria-label="Choisir ${t.name}" aria-pressed="false"><img src="/assets/${t.id}-menu.png" alt="" width="320" height="180" loading="lazy"/><span class="card-name">${t.name}<small>3 TOURS · 6 PILOTES</small></span></button>`).join('');
+    $('#tracks').innerHTML = orderedTracks.map(t => `<button class="track-card" data-track="${t.id}" aria-label="Choisir ${t.name}" aria-pressed="false"><img src="/assets/${t.id}-menu.png" alt="" width="320" height="180" loading="lazy"/><span class="card-name">${t.name}<small>3 TOURS · 12 PILOTES</small></span></button>`).join('');
     $('#pilots').addEventListener('click', e => { const card = e.target.closest('[data-pilot]'); if (card) choose(card.dataset.pilot); });
     $('#chairs').addEventListener('click', e => { const card = e.target.closest('[data-chair]'); if (card) choose(card.dataset.chair); });
     $('#tracks').addEventListener('click', e => { const card = e.target.closest('[data-track]'); if (card) choose(card.dataset.track); });
@@ -38,6 +39,7 @@ export function createSelection(onChange) {
     }
   }
   function choose(id) {
+    if (screen === 'track' && trackLocked) return;
     if (screen === 'pilot') pilotId = id;
     else if (screen === 'chair') chairId = id;
     else trackId = id;
@@ -69,6 +71,7 @@ export function createSelection(onChange) {
     for (const [id, active] of [['garageStep', !isTrack], ['circuitStep', isTrack]]) { $(`#${id}`).classList.toggle('current', active); if (active) $(`#${id}`).setAttribute('aria-current', 'step'); else $(`#${id}`).removeAttribute('aria-current'); }
     for (const [kind, selected] of [['pilot', pilotId], ['chair', chairId], ['track', trackId]]) for (const card of document.querySelectorAll(`[data-${kind}]`)) {
       const active = card.dataset[kind] === selected; card.classList.toggle('active', active); card.setAttribute('aria-pressed', active);
+      if (kind === 'track') card.disabled = trackLocked;
     }
     $('#dockLabel').textContent = isTrack ? 'CHOISIS TON TERRAIN DE JEU' : isChair ? 'CHOISIS TON FAUTEUIL' : 'CHOISIS TON PERSONNAGE';
     const items = listFor(); $('#selectionCount').textContent = `${pad(items.findIndex(item => item.id === idFor()) + 1)} / ${pad(items.length)}`;
@@ -100,6 +103,8 @@ export function createSelection(onChange) {
   });
   return {
     choices,
+    setChoices(user) {chairId=user.chairId;pilotId=user.pilotId;render();},
+    setMultiplayer(id,host) {if(trackId===id && trackLocked===!host)return;trackId=id;trackLocked=!host;render();if(trackLocked)$('#menuStatus').textContent='Le circuit est choisi par l’hôte du salon.';else $('#menuStatus').textContent='';},
     show,
     setVisible(value) { visible = value; garage?.setActive(value && screen !== 'track'); },
     setReady(value) { ready = value; $('#continueButton').disabled = !value; $('#startButton').disabled = !value; },
@@ -107,12 +112,12 @@ export function createSelection(onChange) {
       if (!populated) render();
       const racers = state?.racers || [], signature = JSON.stringify(racers.map(r => [r.id, r.name, r.isBot]));
       if (signature === rosterSignature) return; rosterSignature = signature;
-      $('#slots').replaceChildren(...Array.from({ length: 6 }, (_, i) => {
+      $('#slots').replaceChildren(...Array.from({ length: MAX_RACERS }, (_, i) => {
         const r = racers[i], slot = document.createElement('span'); slot.className = `slot ${r && !r.isBot ? 'human' : ''}`;
         slot.textContent = r && !r.isBot ? '●' : 'AI'; slot.title = r ? `${r.name}${r.isBot ? ' · bot' : ''}` : 'Place libre — complétée par un bot'; return slot;
       }));
       const humans = racers.filter(r => !r.isBot).length;
-      $('#gridLabel').textContent = `${humans || 1} joueur${humans > 1 ? 's' : ''} · ${6 - (humans || 1)} bots · 3 tours`;
+      $('#gridLabel').textContent = `${humans} joueur${humans > 1 ? 's' : ''} · ${MAX_RACERS - humans} bots · 3 tours`;
     },
   };
 }

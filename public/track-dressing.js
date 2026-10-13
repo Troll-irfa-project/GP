@@ -4,6 +4,7 @@ import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
 import { pointAt } from './racing.js';
 import { distanceToRoute } from './motion.js';
 import { groundHeight } from './environment-math.js';
+import { MAX_RACERS, gridSlot } from './game-config.js';
 
 // Colour-per-instance scenery: a whole race festival without one draw call per prop.
 export function dressCircuit(root, track, course, palette) {
@@ -41,8 +42,8 @@ export function dressCircuit(root, track, course, palette) {
 
   // Start grid and small pit-side grandstands with coloured seats, roof and flags.
   const gate = course.finishGate, heading = Math.atan2(gate.tz, gate.tx);
-  for (let i = 0; i < 6; i++) {
-    const p = pointAt(course, -4 - Math.floor(i / 2) * 3.5, (i % 2 ? 1 : -1) * 1.5);
+  for (let i = 0; i < MAX_RACERS; i++) {
+    const slot = gridSlot(i), p = pointAt(course, slot.along, slot.lane);
     add('box', '#fff6cf', p.x, .426, p.z, 2.25, .012, .07, Math.PI / 2 - heading);
   }
   for (const side of [-1, 1]) {

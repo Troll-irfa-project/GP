@@ -9,11 +9,24 @@ import { loadModels } from './model-assets.js';
 import { createRaceWorld, animateWorld } from './race-world.js';
 import { createRaceEffects, attachContactShadow } from './race-effects.js';
 import { RoomEnvironment } from './vendor/RoomEnvironment.js';
+import { createPortal } from './portal.js';
 
 const $ = selector => document.querySelector(selector);
 const lobby = $('#lobby'), race = $('#race'), result = $('#result'), canvas = $('#game');
-let socket, state, playerId;
-const selection = createSelection(choices => send('configure', choices));
+let socket, state, playerId, currentRoom = null, portal;
+const selection = createSelection(choices => {
+  updateFavorite();
+  if (currentRoom && state?.lobby.phase === 'waiting') {
+    const data = { chairId:choices.chairId, pilotId:choices.pilotId };
+    if (state.lobby.hostId === playerId) data.trackId = choices.trackId;
+    send('configure',data);
+  }
+});
+function updateFavorite() {
+  const favorite = portal?.user?.favoriteChairIds.includes(selection.choices().chairId) || false;
+  $('#favoriteChair').setAttribute('aria-pressed',String(favorite));
+  $('#favoriteChair').textContent = favorite ? '★ FAVORI' : '☆ FAVORI';
+}
 const escapeHtml = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let scene, camera, renderer, sun, effects, environment, models, preparedChair, world = new Map(), raf, keys = {};
 const snapshots = new SnapshotBuffer(100);
@@ -23,31 +36,45 @@ const sunOffset = new THREE.Vector3(-28, 46, -18);
 
 function send(type, data = {}) { if (socket?.readyState === 1) socket.send(JSON.stringify({ type, ...data })); }
 function connect() {
-  socket = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}`);
-  socket.onopen = () => { $('#connection').textContent = 'serveur en ligne'; selection.setReady(true); };
-  socket.onclose = () => { $('#connection').textContent = 'hors ligne'; selection.setReady(false); $('#menuStatus').textContent = 'Connexion perdue. Recharge la page pour rejoindre le serveur.'; };
-  socket.onmessage = event => {
-    const message = JSON.parse(event.data);
-    if (message.type === 'error') { $('#menuStatus').textContent = message.message; selection.setReady(true); return; }
-    if (message.type === 'joined') { playerId = message.playerId; return; }
-    if (message.type === 'hello') {
-      state = { chairs: message.chairs, tracks: message.tracks, pilots: message.pilots || pilots, racers: [], lobby: {} };
-      renderLobby(); loadModels().catch(() => {}); return;
+  const connection = new WebSocket(`${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`);
+  socket = connection;
+  connection.onopen = () => { if (socket !== connection) return; $('#connection').textContent = 'serveur en ligne'; selection.setReady(true); portal.setOnline(true); };
+  connection.onclose = event => {
+    if (socket !== connection) return;
+    $('#connection').textContent = 'hors ligne'; selection.setReady(false); portal.setOnline(false);
+    if (event.code === 4001) portal.authExpired('Session expirée. Reconnecte-toi pour continuer.');
+    else if (event.code === 4009) portal.error('Ce compte est déjà ouvert dans un autre onglet. Ferme cet onglet puis recharge la page.');
+    else {
+      stopRace(); currentRoom = null; playerId = null; portal.show('rooms');
+      portal.error('Connexion perdue. Recharge la page pour retrouver les rooms.');
     }
-    if (message.type !== 'state') return;
+  };
+  connection.onmessage = event => {
+    if (socket !== connection) return;
+    const message = JSON.parse(event.data);
+    if (message.type === 'error') { portal.setBusy(false); portal.error(message.message); selection.setReady(true); return; }
+    if (message.type === 'joined') { playerId = message.playerId; currentRoom = message.roomId; portal.show('waiting'); portal.error(''); return; }
+    if (message.type === 'left') { currentRoom = null; playerId = null; stopRace(); portal.show('rooms'); portal.error(''); return; }
+    if (message.type === 'rooms') { portal.rooms(message.rooms); return; }
+    if (message.type === 'profile') { portal.setUser(message.user); return; }
+    if (message.type === 'hello') {
+      state = { chairs:message.chairs, tracks:message.tracks, pilots:message.pilots || pilots, racers:[], lobby:{} };
+      portal.setUser(message.user); renderLobby(); loadModels().catch(() => {}); return;
+    }
+    if (message.type !== 'state' || message.lobby.roomId !== currentRoom) return;
     const reset = state?.lobby.raceId !== message.lobby.raceId;
     state = { ...state, ...message };
     state.lobby.track = state.tracks.find(track => track.id === state.lobby.trackId);
     snapshots.push(state, performance.now());
     if (reset) { cameraReady = false; finishPresentedAt = null; effects?.reset(); }
-    if (!lobby.classList.contains('hidden')) {
-      const signature = JSON.stringify(state.racers.map(r => [r.id, r.name, r.pilotId]));
-      if (signature !== lobbySignature) { lobbySignature = signature; renderLobby(); }
-    }
-    if ((state.lobby.started || state.lobby.countdown) && race.classList.contains('hidden') && result.classList.contains('hidden')) showRace();
-    if (!state.lobby.started && !state.lobby.countdown && !race.classList.contains('hidden')) {
-      race.classList.add('hidden'); lobby.classList.remove('hidden'); document.body.classList.remove('in-race'); cancelAnimationFrame(raf); selection.setVisible(true); selection.setReady(true); $('#menuStatus').textContent = ''; renderLobby();
-    }
+    selection.setMultiplayer(state.lobby.trackId,state.lobby.hostId === playerId);
+    if (portal.page === 'garage') renderLobby();
+    // Lobby DOM is event-driven; physics snapshots should not rebuild 12 cards at 15 Hz.
+    const signature = JSON.stringify([state.lobby.roomId,state.lobby.phase,state.lobby.hostId,state.lobby.trackId,state.racers.map(r=>[r.id,r.name,r.chairId,r.pilotId,r.isBot,r.finished])]);
+    if (signature !== lobbySignature) {lobbySignature=signature;portal.updateWaiting(state,playerId);}
+    const me = state.racers.find(r=>r.id===playerId);
+    if ((state.lobby.started || state.lobby.countdown) && !me?.finished && portal.page !== 'race') showRace();
+    if (state.lobby.phase === 'waiting' && !['waiting','garage'].includes(portal.page)) {stopRace();portal.show('waiting');}
     if (performance.now() - lastHudUpdate > 100 || state.lobby.countdown) {
       updateRaceUi(); lastHudUpdate = performance.now();
     }
@@ -125,8 +152,7 @@ function resize() {
   renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix();
 }
 async function showRace() {
-  selection.setVisible(false);
-  lobby.classList.add('hidden'); result.classList.add('hidden'); race.classList.remove('hidden'); document.body.classList.add('in-race');
+  portal.show('race');
   $('#raceTrackName').textContent = state.lobby.track.name.toUpperCase();
   $('#raceStatus').textContent = 'À TOI LA PISTE !';
   try { models = await loadModels(); }
@@ -198,7 +224,7 @@ function updateRaceUi() {
 }
 function finish() {
   if (result.classList.contains('hidden')) { keys = {}; updateInput(); cancelAnimationFrame(raf); }
-  document.body.classList.remove('in-race'); race.classList.add('hidden'); result.classList.remove('hidden');
+  portal.show('result');
   const sorted = [...state.racers].sort(compareRacers), place = sorted.findIndex(r => r.id === playerId);
   $('#resultTitle').textContent = place === 0 ? 'TU AS GAGNÉ.' : `#${place + 1}, BELLE COURSE.`;
   $('#resultCopy').textContent = `Victoire de ${sorted[0].name}. ${sorted.some(r => !r.finished) ? 'Les autres pilotes sont encore en piste.' : 'Classement final.'}`;
@@ -223,33 +249,42 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) { keys = {}; updateInput(); }
   cameraReady = false; previousFrame = 0;
 });
-$('#startButton').onclick = async () => {
-  if (socket?.readyState !== 1) return;
-  selection.setReady(false); $('#menuStatus').textContent = 'Chargement du monde 3D…';
-  try { models = await loadModels(); } catch { selection.setReady(true); $('#menuStatus').textContent = 'Chargement 3D impossible. Réessaie.'; return; }
-  if (socket?.readyState !== 1) return;
-  const choices = selection.choices();
-  selection.setVisible(false); $('#menuStatus').textContent = 'Préparation des shaders…';
+async function launchRace() {
+  if (socket?.readyState !== 1 || state?.lobby.hostId !== playerId) return;
+  const roomId = currentRoom, choices = selection.choices(); let failure = null;
+  portal.setBusy(true,'Chargement du monde 3D…');
   try {
-    buildWorld(); buildTrack(state.tracks.find(t => t.id === choices.trackId));
+    models = await loadModels();
+    if (roomId !== currentRoom || socket?.readyState !== 1) return;
+    buildWorld(); buildTrack(state.lobby.track);
     if (preparedChair) disposeObject(preparedChair);
-    preparedChair = makeChair(THREE, state.chairs.find(c => c.id === choices.chairId), pilots.find(p => p.id === choices.pilotId), { race: true });
-    preparedChair.traverse(o => { if (o.isMesh) o.castShadow = true; });
-    scene.add(preparedChair); await renderer.compileAsync(scene, camera); preparedChair?.removeFromParent();
+    preparedChair = makeChair(THREE,state.chairs.find(c=>c.id===choices.chairId),pilots.find(p=>p.id===choices.pilotId),{race:true});
+    preparedChair.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+    scene.add(preparedChair); await renderer.compileAsync(scene,camera); preparedChair?.removeFromParent();
+    if (roomId === currentRoom && state.lobby.hostId === playerId && socket?.readyState === 1) send('start');
   } catch (error) {
-    if (preparedChair) { disposeObject(preparedChair); preparedChair = null; }
-    selection.setVisible(true); selection.setReady(true); $('#menuStatus').textContent = 'Initialisation graphique impossible. Réessaie.'; console.error(error); return;
-  }
-  if (socket?.readyState !== 1) { selection.setVisible(true); return; }
-  $('#menuStatus').textContent = 'Préparation de la grille…';
-  if (!playerId) send('join', { name: $('#playerName').value, ...choices });
-  else send('configure', { name: $('#playerName').value, ...choices });
-  send('start');
-};
-function returnToGarage() {
-  race.classList.add('hidden'); result.classList.add('hidden'); lobby.classList.remove('hidden'); document.body.classList.remove('in-race');
-  cancelAnimationFrame(raf); keys = {}; updateInput(); send('restart'); selection.setReady(socket?.readyState === 1); selection.setVisible(true); selection.show('pilot'); $('#menuStatus').textContent = ''; renderLobby();
+    if (preparedChair) {disposeObject(preparedChair);preparedChair=null;}
+    console.error(error);failure='Initialisation 3D impossible. Réessaie.';
+  } finally {portal.setBusy(false);if(failure)portal.error(failure);}
 }
-$('#backButton').onclick = returnToGarage;
-$('#againButton').onclick = returnToGarage;
-connect();
+function stopRace() {
+  cancelAnimationFrame(raf); keys = {}; updateInput(); effects?.reset(); document.body.classList.remove('in-race');
+}
+function leaveRoom() {stopRace();send('leave_room');}
+function returnToGarage() {stopRace();leaveRoom();}
+function returnToRoom() {stopRace();portal.show(currentRoom?'waiting':'rooms');}
+$('#startButton').onclick = returnToRoom;
+$('#garageRoomButton').onclick = returnToRoom;
+$('#backButton').onclick = leaveRoom;
+$('#againButton').onclick = returnToRoom;
+portal = createPortal({
+  onView(page) {selection.setVisible(page==='garage');if(page!=='race')cancelAnimationFrame(raf);},
+  onSignedIn(user) {selection.setChoices(user);connect();},
+  onSignedOut() {const old=socket;socket=null;old?.close();currentRoom=null;playerId=null;stopRace();portal.setOnline(false);},
+  onProfile() {updateFavorite();},
+  onJoin(roomId) {send('join_room',{roomId,...selection.choices()});},
+  onLeave:leaveRoom,onStart:launchRace,
+  onGarage() {selection.setReady(socket?.readyState===1);selection.show('pilot');renderLobby();updateFavorite();},
+  getChoices:()=>selection.choices(),
+});
+portal.bootstrap();

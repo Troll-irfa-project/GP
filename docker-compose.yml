@@ -4,3 +4,14 @@ services:
     ports:
       - "8080:8080"
     restart: unless-stopped
+    environment:
+      ROOM_COUNT: "3"
+      DB_PATH: /app/data/rollrush.sqlite
+      # Pour un déploiement HTTPS derrière un reverse proxy, ajouter :
+      # APP_ORIGIN: https://votre-domaine.example
+      # COOKIE_SECURE: "true"
+    volumes:
+      - rollrush-data:/app/data
+
+volumes:
+  rollrush-data:

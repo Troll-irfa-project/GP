@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawn } from 'node:child_process';
+import { startTestServer, register } from './helpers.js';
 import { WebSocket } from 'ws';
 import * as THREE from 'three';
 import { chairs, pilots, tracks } from '../public/catalog.js';
@@ -34,10 +34,11 @@ test('new decorative footprints stay clear of all five circuits', () => {
 });
 
 test('WebSocket: each human and bot keeps its own pilot and chair', { timeout: 15000 }, async () => {
-  const port = 8101, server = spawn(process.execPath, ['server.js'], { env: { ...process.env, PORT: String(port) }, stdio: 'pipe' });
+  const port = 8101, server = await startTestServer(port);
   const sockets = [];
   async function client() {
-    const ws = new WebSocket(`ws://127.0.0.1:${port}`); sockets.push(ws);
+    const account=await register(server.url);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/ws`,{headers:{Cookie:account.cookie,Origin:server.url}}); sockets.push(ws);
     const messages = [];
     ws.on('message', data => messages.push(JSON.parse(data.toString())));
     return {
@@ -54,15 +55,15 @@ test('WebSocket: each human and bot keeps its own pilot and chair', { timeout: 1
     const a = await client(), b = await client();
     assert.equal((await a.wait(m => m.type === 'hello')).pilots.length, 7);
     await b.wait(m => m.type === 'hello');
-    a.send({ type: 'join', name: 'Alice', chairId: 'comet', pilotId: 'maya', trackId: 'coast' });
+    a.send({ type: 'join_room', roomId: 'room-1', name: 'Alice', chairId: 'comet', pilotId: 'maya', trackId: 'coast' });
     const joinedA = await a.wait(m => m.type === 'joined');
-    b.send({ type: 'join', name: 'Bob', chairId: 'pulse', pilotId: 'camille', trackId: 'coast' });
+    b.send({ type: 'join_room', roomId: 'room-1', name: 'Bob', chairId: 'pulse', pilotId: 'camille', trackId: 'coast' });
     const joinedB = await b.wait(m => m.type === 'joined');
     const first = await a.wait(m => m.type === 'state' && m.racers.some(r => r.id === joinedB.playerId));
-    assert.equal(first.racers.length, 6);
+    assert.equal(first.racers.length, 12);
     assert.equal(first.tracks, undefined, 'detailed static routes are not retransmitted every tick');
     assert.equal(first.lobby.track, undefined);
-    assert.ok(Buffer.byteLength(JSON.stringify(first)) < 9000, 'six-player snapshot stays compact');
+    assert.ok(Buffer.byteLength(JSON.stringify(first)) < 15000, 'twelve-player snapshot stays compact');
     assert.equal(first.racers.find(r => r.id === joinedA.playerId).pilotId, 'maya');
     assert.equal(first.racers.find(r => r.id === joinedB.playerId).pilotId, 'camille');
     assert.ok(first.racers.filter(r => r.isBot).every(r => pilots.some(p => p.id === r.pilotId)));
@@ -74,5 +75,5 @@ test('WebSocket: each human and bot keeps its own pilot and chair', { timeout: 1
     assert.equal(changed.racers.find(r => r.id === joinedA.playerId).chairId, 'atlas');
     assert.equal(changed.racers.find(r => r.id === joinedB.playerId).pilotId, 'camille');
     assert.equal(changed.racers.find(r => r.id === joinedB.playerId).chairId, 'pulse');
-  } finally { for (const ws of sockets) ws.terminate(); server.kill(); }
+  } finally { for (const ws of sockets) ws.terminate(); await server.close(); }
 });

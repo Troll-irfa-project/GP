@@ -4,3 +4,7 @@ playwright-report
 tests
 .git
 example visual
+data
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

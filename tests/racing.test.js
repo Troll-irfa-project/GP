@@ -4,10 +4,10 @@ import { chairs, tracks } from '../public/catalog.js';
 import { createCourse, spawnRacer, stepRace, nearest, pointAt, updateLapProgress, gateCrossing, compareRacers } from '../public/racing.js';
 const dt = 1 / 60;
 
-for (const track of tracks) test(`six bots finish three laps on ${track.id} without recovery or prolonged excursions`, () => {
+for (const track of tracks) test(`twelve bots finish three laps on ${track.id} without recovery or prolonged excursions`, () => {
   const course = createCourse(track);
-  const racers = Array.from({length: 6}, (_, i) => {
-    const r = { id: `bot-${i}`, chairId: chairs[i % 5].id, isBot: true, skill: .94 + i * .01 };
+  const racers = Array.from({length: 12}, (_, i) => {
+    const r = { id: `bot-${i}`, chairId: chairs[i % 5].id, isBot: true, skill: .92 + i % 6 * .012 };
     spawnRacer(r, i, course); return r;
   });
   const offTime = racers.map(() => 0), longestOff = racers.map(() => 0);

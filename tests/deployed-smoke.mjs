@@ -1,5 +1,6 @@
 import { chromium } from '@playwright/test';
 import assert from 'node:assert/strict';
+import { signInPage, enterGarage, startRoomRace } from './helpers.js';
 
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--enable-unsafe-swiftshader'] });
 try {
@@ -8,7 +9,12 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   page.on('console', message => { if (message.type() === 'error' && /THREE|WebGL|shader|GLTF/i.test(message.text())) errors.push(message.text()); });
   page.on('response', response => { if (response.status() >= 400 && !response.url().endsWith('favicon.ico')) failed.push(response.url()); });
-  await page.goto(process.env.GAME_TEST_URL || 'http://localhost:8080');
+  const url=process.env.GAME_TEST_URL || 'http://localhost:8080';
+  await signInPage(page,url);
+  await page.goto(url);
+  await page.locator('#roomBrowser').waitFor();
+  assert.equal(await page.locator('.room-card').count(),3);
+  await enterGarage(page);
   await page.locator('.pilot-card').first().waitFor();
   await page.evaluate(() => document.fonts.ready);
   assert.equal(await page.evaluate(() => document.fonts.check('16px Race')), true);
@@ -30,14 +36,16 @@ try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   }
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.locator('#startButton').click();
+  await startRoomRace(page);
   await page.locator('#game').waitFor();
-  await page.waitForFunction(() => document.querySelector('#raceMapDots').children.length === 6 && document.querySelector('#countdown').textContent === '');
+  await page.waitForFunction(() => document.querySelector('#raceMapDots').children.length === 12 && document.querySelector('#countdown').textContent === '');
   await page.keyboard.down('w'); await page.waitForTimeout(2300); await page.keyboard.up('w');
   assert.ok(Number(await page.locator('#speedValue').textContent()) > 10);
   const canvas = await page.locator('#game').boundingBox(); assert.equal(canvas.width, 1440); assert.equal(canvas.height, 900);
   await page.screenshot({ path: 'test-results/deployed-race.png' });
   await page.locator('#backButton').click();
   assert.deepEqual(errors, []); assert.deepEqual(failed, []);
-  console.log('Docker smoke OK: local GLB assets, shaders, full-screen racing with 6 racers, local font, 3 selection screens, 1440/1024/390px, no browser errors.');
+  await page.locator('#roomBrowser').waitFor();
+  await page.locator('#logoutButton').click();await page.locator('#authScreen').waitFor();
+  console.log('Docker smoke OK: account/session, 3 rooms, 12 racers, local GLB assets, shaders, 3 selection screens, 1440/1024/390px, logout, no browser errors.');
 } finally { await browser.close(); }
