@@ -1,4 +1,5 @@
 import { angleDelta, driveSpeed, steeringRate, topSpeed } from './motion.js';
+import { difficulties } from './competition.js';
 import { gridSlot } from './game-config.js';
 
 const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
@@ -100,9 +101,13 @@ export function compareRacers(a, b) {
 
 export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
   // Pure pursuit: aim at a position ahead ON the route, not just the segment's tangent.
+  const tuning = difficulties.find(d=>d.id===r.aiDifficulty) || {corner:1,line:0,drift:0};
   const errorFromRoad = n.distance;
   const lookahead = clamp(3.5 + Math.abs(r.speed) * .30, 4, 10);
-  let lane = r.ai.lane * .6;
+  const aheadTangent=pointAt(course,n.along+12);
+  const bend=angleDelta(Math.atan2(n.tz,n.tx),Math.atan2(aheadTangent.tz,aheadTangent.tx));
+  let lane = tuning.line ? r.ai.lane*.15 + clamp(bend*2,-1,1)*tuning.line : r.ai.lane*.6;
+  if(tuning.line && course.boosts.some(mark=>{const ahead=pathDelta(course,n.along,mark);return ahead>=0&&ahead<16;}))lane=0;
   const ownLateral = (r.x - n.x) * -n.tz + (r.z - n.z) * n.tx;
   const blocker = racers.find(other => {
     if (other === r || other.finished || other.speed > r.speed - .8 && other.speed > 2) return false;
@@ -120,8 +125,8 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
   const error = angleDelta(r.heading, Math.atan2(dz, dx));
   const distance = Math.max(1, Math.hypot(dx, dz));
   const angularSpeed = 2 * Math.max(4, r.speed) * Math.sin(error) / distance;
-  const steer = Math.abs(error) > 1.1 ? Math.sign(error) : clamp(angularSpeed / steeringRate(chair, r.speed), -1, 1);
-  let speedLimit = topSpeed(chair) * (r.skill || 1);
+  let steer = Math.abs(error) > 1.1 ? Math.sign(error) : clamp(angularSpeed / steeringRate(chair, r.speed), -1, 1);
+  let speedLimit = topSpeed(chair) * (r.skill || 1) * (r.boost>0 ? 1.35 : 1);
   // Brake BEFORE a vertex, using the available deceleration and turn radius.
   for (let i = 0; i < course.segments.length; i++) {
     const s = course.segments[i], next = course.segments[(i + 1) % course.segments.length];
@@ -129,7 +134,7 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
     if (ahead > 30) continue;
     const angle = Math.abs(angleDelta(Math.atan2(s.tz, s.tx), Math.atan2(next.tz, next.tx)));
     if (angle < .15) continue;
-    const turnSpeed = clamp(steeringRate(chair, 12) * 5.5 / angle, 8, speedLimit);
+    const turnSpeed = clamp(steeringRate(chair, 12) * 5.5 * tuning.corner / angle, 8, speedLimit);
     speedLimit = Math.min(speedLimit, Math.sqrt(turnSpeed ** 2 + 2 * 10 * Math.max(0, ahead - lookahead)));
   }
   // Rounded corners have many tiny vertices: anticipate their combined curvature.
@@ -137,13 +142,17 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
     const a = pointAt(course, n.along + ahead - 5), b = pointAt(course, n.along + ahead + 5);
     const angle = Math.abs(angleDelta(Math.atan2(a.tz, a.tx), Math.atan2(b.tz, b.tx)));
     if (angle < .25) continue;
-    const turnSpeed = clamp(steeringRate(chair, 12) * 5.5 / angle, 9, speedLimit);
+    const turnSpeed = clamp(steeringRate(chair, 12) * 5.5 * tuning.corner / angle, 9, speedLimit);
     speedLimit = Math.min(speedLimit, Math.sqrt(turnSpeed ** 2 + 20 * Math.max(0, ahead - lookahead)));
   }
-  if (Math.abs(error) > .75) speedLimit = Math.min(speedLimit, 11);
+  if (Math.abs(error) > .75) speedLimit = Math.min(speedLimit, 11*tuning.corner);
   if (Math.abs(error) > 1.15 || errorFromRoad > course.width - 1) speedLimit = Math.min(speedLimit, 4.5);
   // AI braking targets a positive speed; it must never engage reverse in a corner.
-  return { gas: true, brake: false, drift: false, steer, speedLimit };
+  r.ai.driftCooldown=Math.max(0,(r.ai.driftCooldown || 0)-dt);
+  const drift=Boolean(tuning.drift && r.ai.driftCooldown===0 && r.speed>10 && Math.abs(steer)>.25 && Math.abs(error)<.75 && errorFromRoad<course.width-2 && r.drift<tuning.drift);
+  if(r.wasDrifting&&!drift)r.ai.driftCooldown=1.2;
+  if(drift)steer=clamp(angularSpeed/(steeringRate(chair,r.speed)*1.3),-1,1);
+  return { gas: true, brake: false, drift, steer, speedLimit };
 }
 
 function recoverBot(r, course, racers) {
@@ -168,8 +177,8 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0) {
     const chair = chairs.find(c => c.id === r.chairId);
     const n = nearest(course, r.x, r.z, r.isBot ? r.lastAlong : null);
     const input = r.isBot ? botInput(r, chair, course, n, racers, dt) : r.input || {};
-    const grip = n.distance <= course.width ? 1 : Math.max(.35, chair.offroad / 10);
-    r.speed = driveSpeed(r.speed, input, chair, grip, r.boost, r.isBot ? r.skill || 1 : 1, dt);
+    const grip = n.distance <= course.width ? 1 : Math.min(1,Math.max(.35, chair.offroad / 10) * (r.upgradeId === 'module-grip' ? 1.02 : 1));
+    r.speed = driveSpeed(r.speed, input, chair, grip, r.boost, r.isBot ? r.skill || 1 : 1, dt, r.upgradeId);
     const steer = input.steer ?? ((input.right ? 1 : 0) - (input.left ? 1 : 0));
     r.steer += (clamp(steer, -1, 1) - r.steer) * Math.min(1, dt * 12);
     const drifting = Boolean(input.drift && Math.abs(r.steer) > .15 && r.speed > 9 && grip === 1);
@@ -177,7 +186,7 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0) {
     if (r.wasDrifting && !drifting && r.drift > .35) r.boost = Math.min(1.1, r.drift * .8);
     r.wasDrifting = drifting;
     // Players and AI share the same speed, grip and turning limits.
-    if (Math.abs(r.speed) > .15) r.heading += r.steer * steeringRate(chair, r.speed) * (drifting ? 1.3 : 1) * dt * Math.sign(r.speed);
+    if (Math.abs(r.speed) > .15) r.heading += r.steer * steeringRate(chair, r.speed) * (r.upgradeId === 'module-turn' ? 1.015 : 1) * (drifting ? 1.3 : 1) * dt * Math.sign(r.speed);
     r.heading = Math.atan2(Math.sin(r.heading), Math.cos(r.heading));
     r.x += Math.cos(r.heading) * r.speed * dt; r.z += Math.sin(r.heading) * r.speed * dt;
     r.boost = Math.max(0, r.boost - dt); r.boostCooldown = Math.max(0, r.boostCooldown - dt);

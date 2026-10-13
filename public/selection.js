@@ -1,6 +1,7 @@
 import { chairs, pilots, tracks } from './catalog.js';
 import { silhouettes } from './chairs.js';
 import { createGarage } from './garage.js';
+import { ownsSelection, paintChair, itemFor } from './progression.js';
 import { MAX_RACERS } from './game-config.js';
 
 const $ = selector => document.querySelector(selector);
@@ -16,14 +17,15 @@ const orderedTracks = ['coast', 'neon', 'garden', 'metro', 'orbit'].map(id => tr
 const pad = n => String(n).padStart(2, '0');
 
 export function createSelection(onChange) {
-  let screen = 'pilot', chairId = 'comet', pilotId = 'hawking', trackId = 'coast', garage, ready = false, visible = true;
+  let screen = 'pilot', chairId = 'comet', pilotId = 'maya', trackId = 'coast', garage, ready = false, visible = true;
+  let progression = null;
   let populated = false, rosterSignature = '', trackLocked = false;
   const choices = () => ({ chairId, pilotId, trackId });
   const listFor = () => screen === 'pilot' ? pilots : screen === 'chair' ? chairs : orderedTracks;
   const idFor = () => screen === 'pilot' ? pilotId : screen === 'chair' ? chairId : trackId;
   function populate() {
     if (populated) return; populated = true;
-    $('#pilots').innerHTML = pilots.map(p => `<button class="pilot-card" data-pilot="${p.id}" aria-label="Choisir ${p.name}" aria-pressed="false"><span class="portrait" style="background-position:${p.portrait % 4 * 100 / 3}% ${Math.floor(p.portrait / 4) * 100}%"></span><span class="card-name">${p.name}</span></button>`).join('');
+    $('#pilots').innerHTML = pilots.map(p => `<button class="pilot-card" data-pilot="${p.id}" aria-label="Choisir ${p.name}" aria-pressed="false"><span class="portrait" style="background-position:${(p.portrait || 0) % 4 * 100 / 3}% ${Math.floor((p.portrait || 0) / 4) * 100}%"></span><span class="card-name">${p.name}</span></button>`).join('');
     $('#chairs').innerHTML = chairs.map(c => `<button class="chair-card" data-chair="${c.id}" aria-label="Choisir le fauteuil ${c.name}" aria-pressed="false"><img alt="" width="320" height="180"/><span class="card-name">${c.name}<small>${c.tag.toUpperCase()} · 35 POINTS</small></span></button>`).join('');
     $('#tracks').innerHTML = orderedTracks.map(t => `<button class="track-card" data-track="${t.id}" aria-label="Choisir ${t.name}" aria-pressed="false"><img src="/assets/${t.id}-menu.png" alt="" width="320" height="180" loading="lazy"/><span class="card-name">${t.name}<small>3 TOURS · 12 PILOTES</small></span></button>`).join('');
     $('#pilots').addEventListener('click', e => { const card = e.target.closest('[data-pilot]'); if (card) choose(card.dataset.pilot); });
@@ -31,6 +33,11 @@ export function createSelection(onChange) {
     $('#tracks').addEventListener('click', e => { const card = e.target.closest('[data-track]'); if (card) choose(card.dataset.track); });
     try {
       garage = createGarage($('#garagePreview'));
+      for(const pilot of pilots.filter(p=>p.portrait===null)) {
+        const portrait=garage.thumbnails([chairs[0]],pilot).get(chairs[0].id);
+        const card=document.querySelector(`[data-pilot="${pilot.id}"] .portrait`);
+        card.style.backgroundImage=`url('${portrait}')`;card.style.backgroundSize='cover';card.style.backgroundPosition='center';
+      }
       const thumbs = garage.thumbnails(chairs, pilots[0]);
       for (const card of document.querySelectorAll('.chair-card')) card.querySelector('img').src = thumbs.get(card.dataset.chair);
     } catch (error) {
@@ -40,6 +47,7 @@ export function createSelection(onChange) {
   }
   function choose(id) {
     if (screen === 'track' && trackLocked) return;
+    if (['pilot','chair'].includes(screen) && !ownsSelection(progression,screen,id)) return;
     if (screen === 'pilot') pilotId = id;
     else if (screen === 'chair') chairId = id;
     else trackId = id;
@@ -72,6 +80,15 @@ export function createSelection(onChange) {
     for (const [kind, selected] of [['pilot', pilotId], ['chair', chairId], ['track', trackId]]) for (const card of document.querySelectorAll(`[data-${kind}]`)) {
       const active = card.dataset[kind] === selected; card.classList.toggle('active', active); card.setAttribute('aria-pressed', active);
       if (kind === 'track') card.disabled = trackLocked;
+      else {
+        const locked=!ownsSelection(progression,kind,card.dataset[kind]);
+        card.disabled=locked;card.classList.toggle('locked',locked);
+        card.querySelector('.unlock-label')?.remove();
+        if(locked) {
+          const item=itemFor(kind,card.dataset[kind]);
+          const label=document.createElement('small');label.className='unlock-label';label.textContent=`BOUTIQUE · NIV. ${item.level}`;card.querySelector('.card-name').append(label);
+        }
+      }
     }
     $('#dockLabel').textContent = isTrack ? 'CHOISIS TON TERRAIN DE JEU' : isChair ? 'CHOISIS TON FAUTEUIL' : 'CHOISIS TON PERSONNAGE';
     const items = listFor(); $('#selectionCount').textContent = `${pad(items.findIndex(item => item.id === idFor()) + 1)} / ${pad(items.length)}`;
@@ -87,14 +104,14 @@ export function createSelection(onChange) {
     const xs = track.route.map(p => p[0]), zs = track.route.map(p => p[1]);
     $('#trackRoute').setAttribute('viewBox', `${Math.min(...xs) - 12} ${Math.min(...zs) - 12} ${Math.max(...xs) - Math.min(...xs) + 24} ${Math.max(...zs) - Math.min(...zs) + 24}`);
     $('#trackRoute').innerHTML = `<polyline points="${route} ${start.join(',')}" fill="none" stroke="#05172f" stroke-width="11" stroke-linejoin="round"/><polyline points="${route} ${start.join(',')}" fill="none" stroke="#f9dc50" stroke-width="5" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="5" fill="white" stroke="#0c2544" stroke-width="2"/>`;
-    garage?.update(chair, pilot); garage?.setActive(visible && !isTrack);
+    garage?.update(paintChair(chair,progression?.paint), pilot); garage?.setActive(visible && !isTrack);
     $('#continueButton').disabled = !ready; $('#startButton').disabled = !ready;
   }
   $('#pilotTab').onclick = () => show('pilot'); $('#chairTab').onclick = () => show('chair');
   $('#garageStep').onclick = () => show('pilot'); $('#circuitStep').onclick = () => show('track');
   $('#continueButton').onclick = () => show(screen === 'pilot' ? 'chair' : 'track', true);
   $('#selectionBack').onclick = () => show('chair', true);
-  function move(direction) { const items = listFor(), index = items.findIndex(item => item.id === idFor()); choose(items[(index + direction + items.length) % items.length].id); const card = document.querySelector(`#${screen === 'pilot' ? 'pilots' : screen === 'chair' ? 'chairs' : 'tracks'} .active`); card?.focus({ preventScroll: true }); if (innerWidth <= 700) card?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); }
+  function move(direction) { const items = listFor().filter(i=>screen==='track'||ownsSelection(progression,screen,i.id)), index = items.findIndex(item => item.id === idFor()); choose(items[(index + direction + items.length) % items.length].id); const card = document.querySelector(`#${screen === 'pilot' ? 'pilots' : screen === 'chair' ? 'chairs' : 'tracks'} .active`); card?.focus({ preventScroll: true }); if (innerWidth <= 700) card?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); }
   $('#previousChoice').onclick = () => move(-1); $('#nextChoice').onclick = () => move(1);
   document.addEventListener('keydown', e => {
     if (!visible || e.target instanceof HTMLInputElement || e.repeat) return;
@@ -103,6 +120,7 @@ export function createSelection(onChange) {
   });
   return {
     choices,
+    setProgression(value) {progression=value;if(populated)render();},
     setChoices(user) {chairId=user.chairId;pilotId=user.pilotId;render();},
     setMultiplayer(id,host) {if(trackId===id && trackLocked===!host)return;trackId=id;trackLocked=!host;render();if(trackLocked)$('#menuStatus').textContent='Le circuit est choisi par l’hôte du salon.';else $('#menuStatus').textContent='';},
     show,

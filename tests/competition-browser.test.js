@@ -73,6 +73,7 @@ test('browser: five real room-engine rounds, standings, next track and saved car
       room.racers.forEach((r,i)=>Object.assign(r,{finished:true,finishTime:80+i,bestLapTime:25,progress:3}));
       manager.tick(1/60);
       await page.locator('#result').waitFor();
+      assert.match(await page.locator('#rewardSummary').textContent(),/RUSH.*XP/);
       assert.match(await page.locator('#resultCup').textContent(),new RegExp(`${15*(round+1)} pts`));
       if(round===4){await page.screenshot({path:'test-results/career-victory.png',fullPage:true});assert.match(await page.locator('#resultCup').textContent(),/VICTOIRE DE/);}
       await page.locator('#againButton').click();

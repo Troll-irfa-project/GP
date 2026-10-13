@@ -40,6 +40,7 @@ test('five-round career, enforced locks, private rooms, stable roster and persis
       if(i<4)assert.deepEqual(db.profile(a.user.id).career.unlocked,['50']);
     }
     assert.deepEqual(routes,tracks.map(t=>t.id));assert.equal(new Set(raceIds).size,5);
+    assert.equal(db.db.prepare('SELECT won_races FROM tournament_results WHERE tournament_id=?').get(room.cup.id).won_races,5);
     assert.equal(room.cup.complete,true);assert.deepEqual(db.profile(a.user.id).career.unlocked,['50','100']);
     manager.completeRace(room);assert.equal(db.profile(a.user.id).championships.length,1);
     assert.equal(db.profile(a.user.id).racesFinished,5);
@@ -101,15 +102,16 @@ test('multiplayer tournament host migration, DNF timeout, points and determinist
 });
 
 for(const track of tracks)test(`AI tiers are significantly faster and finish safely on ${track.id}`,()=>{
-  const times=[];
+  const times=[];const historical50={neon:147,coast:125.7,metro:148.2,garden:128.5,orbit:138.2};
   for(const difficulty of difficulties) {
-    const course=createCourse(track),racers=Array.from({length:12},(_,i)=>({id:String(i),chairId:chairs[i%chairs.length].id,isBot:true,skill:difficulty.speed*(.97+i%6*.012)}));
+    const course=createCourse(track),racers=Array.from({length:12},(_,i)=>({id:String(i),chairId:chairs[i%chairs.length].id,isBot:true,aiDifficulty:difficulty.id,skill:difficulty.speed*(.97+i%6*.012)}));
     racers.forEach((r,i)=>spawnRacer(r,i,course));
     for(let frame=0;frame<18000&&!racers.every(r=>r.finished);frame++)stepRace(racers,course,chairs,1/60,3,(frame+1)/60);
     assert.ok(racers.every(r=>r.finished),`${difficulty.name} all finish`);
     assert.ok(racers.every(r=>r.recoveryCount===0),`${difficulty.name} no stuck recovery`);
     times.push(racers.reduce((s,r)=>s+r.finishTime,0)/racers.length);
   }
+  assert.ok(times[0]<historical50[track.id]*.65,'50cc is substantially tougher than the old baseline');
   for(let i=1;i<times.length;i++)assert.ok(times[i]<times[i-1]*.94,`meaningful speed increase: ${times.join(', ')}`);
   console.log(track.id,times.map(t=>t.toFixed(1)));
 });

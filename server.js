@@ -75,9 +75,19 @@ async function api(req,res,path) {
     for(const [ws,client] of connections) if(client.sessionHash===session.hash) {rooms.remove(client);ws.close(4001,'Déconnexion');}
     return json(res,200,{ok:true},{'Set-Cookie':sessionCookie('',process.env.COOKIE_SECURE==='true')});
   }
+  if(path==='/api/shop/buy' || path==='/api/shop/equip') {
+    if([...connections.values()].some(c=>c.user.id===session.user.id&&c.roomId)) throw new HttpError(409,'Quitte le salon avant de modifier ton équipement.');
+    try {
+      if(path.endsWith('/buy')) accounts.economy.buy(session.user.id,data.itemId);
+      else accounts.economy.equip(session.user.id,data.slot,data.itemId);
+    } catch(error) {throw new HttpError(400,error.message);}
+    const user=accounts.profile(session.user.id);
+    for(const client of connections.values()) if(client.user.id===user.id) rooms.send(client,'profile',{user});
+    return json(res,200,{user});
+  }
   if(path==='/api/profile') {
     const keys=Object.keys(data);
-    if(keys.some(k=>!['favoriteChairIds'].includes(k)) || !Array.isArray(data.favoriteChairIds) || data.favoriteChairIds.length>5 || data.favoriteChairIds.some(id=>!chairs.some(c=>c.id===id))) throw new HttpError(400,'Préférences invalides.');
+    if(keys.some(k=>!['favoriteChairIds'].includes(k)) || !Array.isArray(data.favoriteChairIds) || data.favoriteChairIds.length>chairs.length || data.favoriteChairIds.some(id=>!chairs.some(c=>c.id===id))) throw new HttpError(400,'Préférences invalides.');
     const user=accounts.preferences(session.user.id,{favoriteChairIds:[...new Set(data.favoriteChairIds)]});
     for(const client of connections.values()) if(client.user.id===user.id) rooms.send(client,'profile',{user});
     return json(res,200,{user});

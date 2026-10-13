@@ -9,6 +9,7 @@ import { loadModels } from './model-assets.js';
 import { createRaceWorld, animateWorld } from './race-world.js';
 import { createRaceEffects, attachContactShadow } from './race-effects.js';
 import { RoomEnvironment } from './vendor/RoomEnvironment.js';
+import { paintChair } from './progression.js';
 import { createPortal } from './portal.js';
 
 const $ = selector => document.querySelector(selector);
@@ -70,7 +71,7 @@ function connect() {
     selection.setMultiplayer(state.lobby.trackId,state.lobby.hostId === playerId && (!state.lobby.mode || state.lobby.mode === 'race'));
     if (portal.page === 'garage') renderLobby();
     // Lobby DOM is event-driven; physics snapshots should not rebuild 12 cards at 15 Hz.
-    const signature = JSON.stringify([state.lobby.mode,state.lobby.difficulty,state.lobby.cup,state.lobby.roomId,state.lobby.phase,state.lobby.hostId,state.lobby.trackId,state.racers.map(r=>[r.id,r.name,r.chairId,r.pilotId,r.isBot,r.finished])]);
+    const signature = JSON.stringify([state.lobby.mode,state.lobby.difficulty,state.lobby.cup,state.lobby.roomId,state.lobby.phase,state.lobby.hostId,state.lobby.trackId,state.racers.map(r=>[r.id,r.name,r.chairId,r.pilotId,r.isBot,r.finished,r.title,r.level])]);
     if (signature !== lobbySignature) {lobbySignature=signature;portal.updateWaiting(state,playerId);}
     const me = state.racers.find(r=>r.id===playerId);
     if (me?.dnf && state.lobby.phase === 'results' && portal.page === 'race') finish();
@@ -126,10 +127,11 @@ function disposeObject(object) {
 function syncRacers(now, dt) {
   for (const r of state.racers) {
     let object = world.get(r.id);
-    if (object && (object.userData.chairId !== r.chairId || object.userData.pilotId !== (r.pilotId || pilots[0].id))) { disposeObject(object); world.delete(r.id); object = null; }
+    if (object && (object.userData.paintId !== (r.paintId || null) || object.userData.chairId !== r.chairId || object.userData.pilotId !== (r.pilotId || pilots[0].id))) { disposeObject(object); world.delete(r.id); object = null; }
     if (!object) {
       if (r.id === playerId && preparedChair?.userData.chairId === r.chairId && preparedChair.userData.pilotId === r.pilotId) { object = preparedChair; preparedChair = null; }
-      else object = makeChair(THREE, state.chairs.find(c => c.id === r.chairId) || state.chairs[0], pilots.find(p => p.id === r.pilotId) || pilots[0], { race: true });
+      else object = makeChair(THREE, paintChair(state.chairs.find(c => c.id === r.chairId) || state.chairs[0],r.paintId), pilots.find(p => p.id === r.pilotId) || pilots[0], { race: true });
+      object.userData.paintId = r.paintId || null;
       object.userData.pose = {};
       object.userData.isPlayer = r.id === playerId;
       object.traverse(child => { if (child.isMesh) child.castShadow = r.id === playerId; });
@@ -260,7 +262,7 @@ async function launchRace() {
     if (roomId !== currentRoom || socket?.readyState !== 1) return;
     buildWorld(); buildTrack(state.lobby.track);
     if (preparedChair) disposeObject(preparedChair);
-    preparedChair = makeChair(THREE,state.chairs.find(c=>c.id===choices.chairId),pilots.find(p=>p.id===choices.pilotId),{race:true});
+    preparedChair = makeChair(THREE,paintChair(state.chairs.find(c=>c.id===choices.chairId),portal.user?.progression?.paint),pilots.find(p=>p.id===choices.pilotId),{race:true});
     preparedChair.traverse(o=>{if(o.isMesh)o.castShadow=true;});
     scene.add(preparedChair); await renderer.compileAsync(scene,camera); preparedChair?.removeFromParent();
     if (roomId === currentRoom && state.lobby.hostId === playerId && socket?.readyState === 1) send('start');
@@ -283,7 +285,7 @@ portal = createPortal({
   onView(page) {selection.setVisible(page==='garage');if(page!=='race')cancelAnimationFrame(raf);},
   onSignedIn(user) {selection.setChoices(user);connect();},
   onSignedOut() {const old=socket;socket=null;old?.close();currentRoom=null;playerId=null;stopRace();portal.setOnline(false);},
-  onProfile() {updateFavorite();},
+  onProfile(user) {selection.setProgression(user?.progression || null);updateFavorite();},
   onJoin(roomId) {send('join_room',{roomId,...selection.choices()});},
   onCareer(difficulty) {send('start_career',{difficulty,...selection.choices()});},
   onConfigure(data) {send('configure',data);},

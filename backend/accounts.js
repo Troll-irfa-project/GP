@@ -1,3 +1,5 @@
+import { Economy } from './economy.js';
+import { raceReward, cupReward } from '../public/progression.js';
 import { careerProgress } from '../public/competition.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
@@ -21,7 +23,7 @@ export class Accounts {
       CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY, username TEXT NOT NULL, username_key TEXT NOT NULL UNIQUE,
         password_hash TEXT NOT NULL, created_at INTEGER NOT NULL,
-        chair_id TEXT NOT NULL DEFAULT 'comet', pilot_id TEXT NOT NULL DEFAULT 'hawking',
+        chair_id TEXT NOT NULL DEFAULT 'comet', pilot_id TEXT NOT NULL DEFAULT 'maya',
         favorites TEXT NOT NULL DEFAULT '[]', races_finished INTEGER NOT NULL DEFAULT 0,
         races_won INTEGER NOT NULL DEFAULT 0, championships TEXT NOT NULL DEFAULT '[]'
       );
@@ -45,6 +47,14 @@ export class Accounts {
       ); CREATE INDEX IF NOT EXISTS record_race_rank ON records(track_id,best_race_ms);
       CREATE INDEX IF NOT EXISTS record_lap_rank ON records(track_id,best_lap_ms);
       PRAGMA user_version=2;`);
+    const raceColumns=this.db.prepare('PRAGMA table_info(race_results)').all().map(c=>c.name);
+    if(!raceColumns.includes('difficulty'))this.db.exec('ALTER TABLE race_results ADD COLUMN difficulty TEXT');
+    if(!raceColumns.includes('balance_version'))this.db.exec('ALTER TABLE race_results ADD COLUMN balance_version INTEGER NOT NULL DEFAULT 1');
+    const cupColumns=this.db.prepare('PRAGMA table_info(tournament_results)').all().map(c=>c.name);
+    if(!cupColumns.includes('balance_version'))this.db.exec('ALTER TABLE tournament_results ADD COLUMN balance_version INTEGER NOT NULL DEFAULT 1');
+    if(!cupColumns.includes('won_races'))this.db.exec('ALTER TABLE tournament_results ADD COLUMN won_races INTEGER NOT NULL DEFAULT 0');
+    this.economy = new Economy(this.db);
+    this.economy.migrateBalance();
     this.prune();
   }
   prune() { this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now()); }
@@ -62,7 +72,7 @@ export class Accounts {
     const key = usernameKey(display);
     if (this.db.prepare('SELECT id FROM users WHERE username_key=?').get(key)) throw new HttpError(409, 'Ce pseudo est déjà utilisé.');
     const hash = await this.hash(password), id = randomUUID();
-    try { this.db.prepare('INSERT INTO users(id,username,username_key,password_hash,created_at) VALUES(?,?,?,?,?)').run(id, display, key, hash, Date.now()); }
+    try { this.db.prepare('INSERT INTO users(id,username,username_key,password_hash,created_at,pilot_id) VALUES(?,?,?,?,?,?)').run(id, display, key, hash, Date.now(),'maya'); }
     catch (error) {
       if (this.db.prepare('SELECT id FROM users WHERE username_key=?').get(key)) throw new HttpError(409, 'Ce pseudo est déjà utilisé.');
       throw error;
@@ -83,6 +93,7 @@ export class Accounts {
     const row = this.db.prepare('SELECT id,username,chair_id,pilot_id,favorites,races_finished,races_won,championships FROM users WHERE id=?').get(id);
     if (!row) return null;
     return { id: row.id, username: row.username, chairId: row.chair_id, pilotId: row.pilot_id,
+      progression: this.economy.profile(id),
       favoriteChairIds: JSON.parse(row.favorites), racesFinished: row.races_finished, racesWon: row.races_won,
       championships: [...JSON.parse(row.championships), ...this.db.prepare('SELECT tournament_id AS id,difficulty,mode,points FROM tournament_results WHERE user_id=? AND place=1 AND points>0').all(id)],
       career: careerProgress(this.db.prepare("SELECT DISTINCT difficulty FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND mode='career'").all(id).map(r=>r.difficulty)),
@@ -105,17 +116,21 @@ export class Accounts {
   }
   sessionValid(hash) { return Boolean(this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND expires_at>?').get(hash, Date.now())); }
   revoke(token) { if (token) this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(token)); }
-  recordResult({ raceId, userId, trackId, time, bestLap, place }) {
+  recordResult({ raceId, userId, trackId, time, bestLap, place, difficulty = '100' }) {
     const timeMs = Math.round(time * 1000), lapMs = Number.isFinite(bestLap) ? Math.round(bestLap * 1000) : null;
-    if (!Number.isFinite(timeMs) || timeMs <= 0) return;
+    if (!Number.isFinite(timeMs) || timeMs <= 0 || !Number.isInteger(place) || place<1 || place>12) return;
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const inserted = this.db.prepare('INSERT OR IGNORE INTO race_results VALUES(?,?,?,?,?,?)').run(raceId, userId, trackId, timeMs, place, Date.now());
+      const inserted = this.db.prepare('INSERT OR IGNORE INTO race_results(race_id,user_id,track_id,time_ms,place,created_at,difficulty,balance_version) VALUES(?,?,?,?,?,?,?,2)').run(raceId, userId, trackId, timeMs, place, Date.now(),difficulty);
       if (inserted.changes) {
         this.db.prepare('UPDATE users SET races_finished=races_finished+1,races_won=races_won+? WHERE id=?').run(place === 1 ? 1 : 0, userId);
         this.db.prepare(`INSERT INTO records VALUES(?,?,?,?) ON CONFLICT(user_id,track_id) DO UPDATE SET
           best_race_ms=MIN(best_race_ms,excluded.best_race_ms),
           best_lap_ms=CASE WHEN best_lap_ms IS NULL THEN excluded.best_lap_ms WHEN excluded.best_lap_ms IS NULL THEN best_lap_ms ELSE MIN(best_lap_ms,excluded.best_lap_ms) END`).run(userId, trackId, timeMs, lapMs);
+      }
+      if (inserted.changes) {
+        this.economy.grant(userId,'race:'+raceId,'Course terminée · #'+place,raceReward(place,difficulty));
+        this.economy.checkAchievements(userId);
       }
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
@@ -126,8 +141,14 @@ export class Accounts {
       WHERE r.track_id=? AND r.${column}>0 ORDER BY r.${column},u.username_key LIMIT 50`).all(trackId);
     return {trackId, races:read('best_race_ms'), laps:read('best_lap_ms')};
   }
-  recordTournament({id,userId,difficulty,mode,place,points}) {
-    this.db.prepare('INSERT OR IGNORE INTO tournament_results VALUES(?,?,?,?,?,?,?)').run(id,userId,difficulty,mode,place,points,Date.now());
+  recordTournament({id,userId,difficulty,mode,place,points,wonRaces=0}) {
+    this.economy.transaction(()=>{
+      const inserted=this.db.prepare('INSERT OR IGNORE INTO tournament_results(tournament_id,user_id,difficulty,mode,place,points,created_at,won_races,balance_version) VALUES(?,?,?,?,?,?,?,?,2)').run(id,userId,difficulty,mode,place,points,Date.now(),wonRaces);
+      if(inserted.changes && points>0) {
+        this.economy.grant(userId,'cup:'+id,'Tournoi terminé · #'+place,cupReward(place,difficulty));
+        this.economy.checkAchievements(userId);
+      }
+    });
   }
   close() { this.db.close(); }
 }

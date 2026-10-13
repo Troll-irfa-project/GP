@@ -1,3 +1,4 @@
+import { createProgressionUI } from './progression-ui.js';
 import { createCompetitionUI } from './competition-ui.js';
 import { chairs, tracks, pilots } from './catalog.js';
 
@@ -13,10 +14,11 @@ export async function api(path, data) {
 export function createPortal(callbacks) {
   let user = null, page = 'auth', registering = false, roomState = null, playerId = null, busy = false, online = false;
   const competition = createCompetitionUI({...callbacks,onRecords:open=>show(open?'records':'rooms')},api);
+  const progression = createProgressionUI({show,setUser},api);
   function show(next) {
     if(next==='auth' && page!=='auth') authMode(false);
     page = next;
-    for (const [name,id] of Object.entries({records:'recordsScreen',auth:'authScreen',rooms:'roomBrowser',waiting:'roomLobby',garage:'lobby',race:'race',result:'result'})) $(`#${id}`).classList.toggle('hidden',name!==next);
+    for (const [name,id] of Object.entries({collection:'progressionScreen',records:'recordsScreen',auth:'authScreen',rooms:'roomBrowser',waiting:'roomLobby',garage:'lobby',race:'race',result:'result'})) $(`#${id}`).classList.toggle('hidden',name!==next);
     document.body.classList.toggle('in-race',next==='race'); callbacks.onView(next);
   }
   function setUser(value) {
@@ -31,6 +33,7 @@ export function createPortal(callbacks) {
       const format = ms => `${Math.floor(ms/60000)}:${(ms/1000%60).toFixed(3).padStart(6,'0')}`;
       $('#personalRecords').innerHTML = user.records.length ? user.records.map(r=>`<div><strong>${escapeHtml(tracks.find(t=>t.id===r.trackId)?.name || r.trackId)}</strong><span>Course ${format(r.bestRaceMs)}${r.bestLapMs ? ` · Tour ${format(r.bestLapMs)}` : ''}</span></div>`).join('') : '<p>Termine une course pour inscrire ton premier chrono.</p>';
     }
+    progression.profile(user);
     competition.profile(user);
     callbacks.onProfile(user);
   }
@@ -73,6 +76,7 @@ export function createPortal(callbacks) {
   };
   function updateWaiting(state,id) {
     roomState=state;playerId=id;
+    progression.newRace(state.lobby.raceId);
     const {lobby,racers}=state, host=racers.find(r=>r.id===lobby.hostId), me=racers.find(r=>r.id===id);
     $('#roomName').textContent=lobby.roomName; $('#roomCircuit').textContent=tracks.find(t=>t.id===lobby.trackId)?.name || '';
     $('#roomBackdrop').style.backgroundImage=`linear-gradient(0deg,#07182edd,#09224477 55%,#071c3955),url('/assets/${lobby.trackId}-menu.png')`;
@@ -86,13 +90,13 @@ export function createPortal(callbacks) {
     if(!busy) $('#roomLobbyStatus').textContent=!online?'Connexion au serveur interrompue.':lobby.phase==='waiting'?(canLaunch?'Tu es l’hôte. Attends tes amis, puis lance la course : les bots occupent les places restantes.':`${host?.name || 'L’hôte'} choisit le circuit et lance la course. Tu peux préparer ton fauteuil.`):lobby.phase==='results'?(lobby.cup&&!lobby.cup.complete?'Manche terminée. L’hôte peut lancer le circuit suivant.':'Épreuve terminée. L’hôte peut lancer une revanche.'):me?.finished?'Les autres pilotes terminent leur course. Tu peux rester pour la revanche ou quitter la room.':'La course est en cours.';
     competition.update(state,id);
     if(busy) $('#launchRace').textContent='PRÉPARATION…';
-    $('#roomRoster').innerHTML=racers.map((r,i)=>`<li class="room-seat ${r.id===id?'self':''} ${r.isBot?'bot':''}"><span class="seat-number">${String(i+1).padStart(2,'0')}</span><div><strong>${escapeHtml(r.name)}</strong><small>${escapeHtml(chairs.find(c=>c.id===r.chairId)?.name || '')} · ${escapeHtml(pilots.find(p=>p.id===r.pilotId)?.short || '')}</small></div><span class="seat-role">${r.isBot?'IA':r.id===lobby.hostId?'HÔTE':r.id===id?'TOI':'JOUEUR'}</span></li>`).join('');
+    $('#roomRoster').innerHTML=racers.map((r,i)=>`<li class="room-seat ${r.id===id?'self':''} ${r.isBot?'bot':''}"><span class="seat-number">${String(i+1).padStart(2,'0')}</span><div><strong>${escapeHtml(r.name)}</strong><small>${r.isBot?'IA':`Niv. ${r.level || 1}${r.title?' · '+escapeHtml(r.title):''}`}<br>${escapeHtml(chairs.find(c=>c.id===r.chairId)?.name || '')} · ${escapeHtml(pilots.find(p=>p.id===r.pilotId)?.short || '')}</small></div><span class="seat-role">${r.isBot?'IA':r.id===lobby.hostId?'HÔTE':r.id===id?'TOI':'JOUEUR'}</span></li>`).join('');
   }
   return {
     show,setUser,updateWaiting,get user(){return user;},get page(){return page;},
     setBusy(value,message='') {busy=value;if(roomState)updateWaiting(roomState,playerId);if(message)$('#roomLobbyStatus').textContent=message;},
     setOnline(value){online=value;competition.setOnline(value);if(roomState)updateWaiting(roomState,playerId);for(const button of document.querySelectorAll('[data-room]'))button.disabled=!value||button.dataset.available!=='true';},
-    error(message){const target=page==='auth'?'authStatus':page==='records'?'recordsStatus':page==='rooms'?'roomBrowserStatus':page==='garage'?'menuStatus':'roomLobbyStatus';$(`#${target}`).textContent=message;},
+    error(message){const target=page==='auth'?'authStatus':page==='collection'?'collectionStatus':page==='records'?'recordsStatus':page==='rooms'?'roomBrowserStatus':page==='garage'?'menuStatus':'roomLobbyStatus';$(`#${target}`).textContent=message;},
     authExpired(message){callbacks.onSignedOut();setUser(null);show('auth');$('#authStatus').textContent=message;},
     rooms(list){
       $('#roomCount').textContent=`${list.length} ROOMS DE TEST`;

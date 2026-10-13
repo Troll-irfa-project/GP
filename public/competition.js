@@ -1,8 +1,8 @@
 export const difficulties = [
-  {id:'50', name:'50cc', label:'Découverte', speed:.55},
-  {id:'100', name:'100cc', label:'Sport', speed:.78},
-  {id:'150', name:'150cc', label:'Expert', speed:1},
-  {id:'200', name:'200cc', label:'Élite', speed:1.22},
+  {id:'50', name:'50cc', label:'Club', speed:1.06, corner:1.12, line:.7, drift:.6},
+  {id:'100', name:'100cc', label:'Sport', speed:1.25, corner:1.35, line:1, drift:.9},
+  {id:'150', name:'150cc', label:'Expert', speed:1.45, corner:1.58, line:1.25, drift:1.2},
+  {id:'200', name:'200cc', label:'Élite', speed:1.65, corner:1.8, line:1.45, drift:1.4},
 ];
 export const positionPoints = [15,12,10,9,8,7,6,5,4,3,2,1];
 export function careerProgress(wins) {

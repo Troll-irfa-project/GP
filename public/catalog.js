@@ -4,7 +4,10 @@ export const chairs=[
  {id:'atlas',name:'Atlas',tag:'Impact',color:'#f6c453',speed:6,accel:6,handling:6,offroad:7,weight:10},
  {id:'drift',name:'Drift',tag:'Virages',color:'#58d6c4',speed:8,accel:6,handling:10,offroad:5,weight:6},
  {id:'trail',name:'Trailblazer',tag:'Hors-piste',color:'#9b78ff',speed:7,accel:7,handling:7,offroad:10,weight:4},
- {id:'pulse',name:'Pulse',tag:'Accélération',color:'#70a6ff',speed:9,accel:10,handling:6,offroad:4,weight:6}
+ {id:'pulse',name:'Pulse',tag:'Accélération',color:'#70a6ff',speed:9,accel:10,handling:6,offroad:4,weight:6},
+ {id:'vector',name:'Vector',tag:'Polyvalence',color:'#b389ff',speed:8,accel:8,handling:8,offroad:5,weight:6},
+ {id:'nomad',name:'Nomad',tag:'Exploration',color:'#f0b66b',speed:7,accel:6,handling:6,offroad:9,weight:7},
+ {id:'apex',name:'Apex F1',tag:'Monoplace',color:'#f3394e',speed:10,accel:10,handling:9,offroad:3,weight:3}
 ];
 // Appearance only: pilot choice never changes vehicle handling or performance.
 export const pilots = [
@@ -16,6 +19,10 @@ export const pilots = [
  {id:'camille',name:'Camille Leclerc',short:'Camille',role:'Du style jusqu’à la ligne',color:'#526782',skin:'#d9a17b',hair:'#503728',style:'cap',portrait:5},
  {id:'sofia',name:'Sofia Morel',short:'Sofia',role:'Le calme avant le turbo',color:'#ede0b8',skin:'#b9825c',hair:'#ead39d',style:'bob',portrait:6},
 ];
+pilots.push(
+ {id:'aurore',name:'Aurore Vega',short:'Aurore',role:'L’horizon n’est que le départ',color:'#a17bff',skin:'#e2ad89',hair:'#e9dcec',style:'helmet',portrait:null},
+ {id:'idris',name:'Idris Sol',short:'Idris',role:'Le soleil au bout de la piste',color:'#efba49',skin:'#9c6849',hair:'#252630',style:'helmet',portrait:null}
+);
 export const tracks=[
  {id:'neon',name:'Boucle Néon',subtitle:'Boulevards rapides et double chicane',hue:168,width:6.2,route:trackLayouts.neon},
  {id:'coast',name:'Côte Azur',subtitle:'Corniche, baie et virages en S',hue:196,width:6.0,route:trackLayouts.coast},

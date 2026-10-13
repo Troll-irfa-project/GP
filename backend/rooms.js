@@ -3,6 +3,7 @@ import { chairs, tracks, pilots } from '../public/catalog.js';
 import { MAX_RACERS } from '../public/game-config.js';
 import { createCourse, spawnRacer, stepRace, compareRacers } from '../public/racing.js';
 
+import { ownsSelection, shopItems } from '../public/progression.js';
 import { difficulties, positionPoints, standings } from '../public/competition.js';
 
 const courses = new Map(tracks.map(t => [t.id, createCourse(t)]));
@@ -27,7 +28,7 @@ export class RoomManager {
   add(client) { this.clients.add(client); this.send(client, 'rooms', { rooms:this.list() }); }
   remove(client) { this.leave(client); this.clients.delete(client); }
   bot(index) {
-    return {id:`bot-${++this.nextBot}`,name:names[index % names.length],chairId:chairs[index % chairs.length].id,pilotId:pilots[index % pilots.length].id,isBot:true,skill:.90+(index%6)*.016};
+    return {id:`bot-${++this.nextBot}`,name:names[index % names.length],chairId:chairs[index % 5].id,pilotId:pilots.filter(p=>p.id!=='hawking')[index % 6].id,isBot:true,skill:.90+(index%6)*.016};
   }
   reset(room, preserve = false) {
     room.mode ??= 'race'; room.difficulty ??= '100'; room.deadline = null;
@@ -38,7 +39,7 @@ export class RoomManager {
     if (!preserve) room.racers = humans;
     while (room.racers.length < MAX_RACERS) room.racers.push(this.bot(room.racers.length));
     room.racers.forEach((r,i) => {
-      r.input = {}; r.skill = difficulties.find(d=>d.id===room.difficulty).speed * (.97+(i%6)*.012);
+      r.input = {}; r.aiDifficulty=room.difficulty; r.skill = difficulties.find(d=>d.id===room.difficulty).speed * (.97+(i%6)*.012);
       spawnRacer(r,i,courses.get(room.trackId));
     });
   }
@@ -58,8 +59,9 @@ export class RoomManager {
     if (room.phase !== 'waiting') return this.error(client,'La course a déjà commencé. Choisis une autre room.');
     if (room.members.size >= MAX_RACERS) return this.error(client,'Cette room est complète : 12 joueurs humains.');
     const profile = this.accounts.profile(client.user.id);
+    if (!ownsSelection(profile.progression,'chair',data.chairId || profile.chairId) || !ownsSelection(profile.progression,'pilot',data.pilotId || profile.pilotId)) return this.error(client,'Ce pilote ou fauteuil doit être acheté dans la boutique.');
     client.racer = {id:`p-${client.user.id}`,userId:client.user.id,name:profile.username,
-      chairId:validChair(data.chairId)?data.chairId:profile.chairId,pilotId:validPilot(data.pilotId)?data.pilotId:profile.pilotId,isBot:false,input:{}};
+      chairId:validChair(data.chairId)?data.chairId:profile.chairId,pilotId:validPilot(data.pilotId)?data.pilotId:profile.pilotId,isBot:false,input:{},paintId:profile.progression?.paint || null,upgradeId:profile.progression?.upgrade || null,title:shopItems.find(i=>i.id===profile.progression?.title)?.name || '',level:profile.progression?.level || 1};
     client.roomId = room.id; room.members.set(client.user.id,client);
     this.accounts.preferences(client.user.id,{chairId:client.racer.chairId,pilotId:client.racer.pilotId});
     this.reset(room); this.send(client,'joined',{playerId:client.racer.id,roomId:room.id}); this.broadcast(room); this.announce();
@@ -71,7 +73,7 @@ export class RoomManager {
     if (room.phase === 'waiting' || !room.members.size) this.reset(room);
     else {
       // Mid-race departures never reset the other racers: AI takes over this seat.
-      const r = client.racer; r.isBot = true; delete r.userId; r.name = 'Relais IA'; r.skill = difficulties.find(d=>d.id===room.difficulty).speed; r.input = {};
+      const r = client.racer; r.isBot = true; delete r.userId; r.name = 'Relais IA'; r.aiDifficulty=room.difficulty; r.skill = difficulties.find(d=>d.id===room.difficulty).speed; r.input = {};
     }
     if (!room.members.size && room.private) this.rooms.delete(room.id);
     client.racer = null; this.send(client,'left'); this.broadcast(room); this.announce();
@@ -83,6 +85,8 @@ export class RoomManager {
     if (data.mode !== undefined && !['race','tournament'].includes(data.mode) || data.difficulty !== undefined && !difficulties.some(d=>d.id===data.difficulty)) return this.error(client,'Mode ou difficulté invalide.');
     if (data.trackId && data.trackId !== room.trackId && this.host(room) !== client) return this.error(client,'Seul l’hôte choisit le circuit.');
     if (data.chairId && !validChair(data.chairId) || data.pilotId && !validPilot(data.pilotId) || data.trackId && !tracks.some(t=>t.id===data.trackId)) return this.error(client,'Choix de course invalide.');
+    const profile=this.accounts.profile(client.user.id);
+    if (!ownsSelection(profile.progression,'chair',data.chairId || client.racer.chairId) || !ownsSelection(profile.progression,'pilot',data.pilotId || client.racer.pilotId)) return this.error(client,'Ce pilote ou fauteuil n’est pas encore dans ta collection.');
     if (data.mode) room.mode = data.mode;
     if (data.difficulty) room.difficulty = data.difficulty;
     if (data.chairId) client.racer.chairId = data.chairId;
@@ -133,8 +137,10 @@ export class RoomManager {
         standings(room.cup.entries).forEach((entry,i)=>{
           // Departed racers are AI relays, never a source of offline career wins.
           if (!entry.userId || !room.members.has(entry.userId)) return;
-          this.accounts.recordTournament({id:room.cup.id,userId:entry.userId,difficulty:room.difficulty,mode:room.mode,place:i+1,points:entry.points});
-          this.send(room.members.get(entry.userId),'profile',{user:this.accounts.profile(entry.userId)});
+          this.accounts.recordTournament({id:room.cup.id,userId:entry.userId,difficulty:room.difficulty,mode:room.mode,place:i+1,points:entry.points,wonRaces:entry.wins});
+          const client=room.members.get(entry.userId),user=this.accounts.profile(entry.userId);
+          client.racer.level=user.progression?.level || client.racer.level;
+          this.send(client,'profile',{user});
         });
       }
     }
@@ -169,10 +175,13 @@ export class RoomManager {
       const sorted = [...room.racers].sort(compareRacers);
       if (sorted[0].finished) room.winner = sorted[0].name;
       for (const [i,r] of sorted.entries()) if (r.finished && !r.dnf && r.userId && !room.recorded.has(r.id)) {
-        this.accounts.recordResult({raceId:room.raceId,userId:r.userId,trackId:room.trackId,time:r.finishTime,bestLap:r.bestLapTime,place:i+1});
+        this.accounts.recordResult({raceId:room.raceId,userId:r.userId,trackId:room.trackId,time:r.finishTime,bestLap:r.bestLapTime,place:i+1,difficulty:room.difficulty});
         room.recorded.add(r.id);
         const client = room.members.get(r.userId);
-        if (client) this.send(client,'profile',{user:this.accounts.profile(r.userId)});
+        if (client) {
+          const user=this.accounts.profile(r.userId);r.level=user.progression?.level || r.level;
+          this.send(client,'profile',{user});
+        }
       }
       if (!room.deadline && sorted[0].finished) room.deadline = room.raceTime + 60;
       if (room.raceTime >= Math.min(room.deadline || 300,300)) {

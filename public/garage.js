@@ -61,7 +61,7 @@ export function createGarage(canvas) {
   for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(event, () => { dragX = null; });
   return {
     update(chair, pilot) {
-      const next = `${chair.id}/${pilot.id}`;
+      const next = `${chair.id}/${chair.color}/${pilot.id}`;
       if (signature === next) return;
       signature = next; if (model) disposeModel(model);
       model = makeChair(THREE, chair, pilot); model.position.y = .2; scene.add(model); yaw = 0;

@@ -1,0 +1,63 @@
+// Shared display rules. Currency, ownership and rewards are enforced by the server.
+export const shopItems = [
+  {id:'paint-lagoon',type:'paint',name:'Lagon électrique',description:'Carrosserie turquoise et finitions nacrées.',price:500,level:2,color:'#21d9bd'},
+  {id:'paint-sunset',type:'paint',name:'Coucher de soleil',description:'Carrosserie rose corail.',price:1000,level:3,color:'#ff5299'},
+  {id:'paint-gold',type:'paint',name:'Or du champion',description:'Livrée dorée réservée aux vainqueurs de coupe.',price:2600,level:7,achievement:'cup-winner',color:'#ffd34e'},
+  {id:'module-start',type:'upgrade',name:'Contrôleur précis',description:'Accélération +2 %. Aucun gain de vitesse maximale.',price:1500,level:5,effect:'acceleration'},
+  {id:'module-grip',type:'upgrade',name:'Pneus souples',description:'Adhérence hors-piste +2 %, sans dépasser la vitesse sur route.',price:1500,level:5,effect:'grip'},
+  {id:'module-turn',type:'upgrade',name:'Direction fine',description:'Vitesse de braquage +1,5 %. Un seul module équipé.',price:2400,level:8,achievement:'explorer',effect:'steering'},
+  {id:'pilot-aurore',type:'pilot',target:'aurore',name:'Aurore Vega',description:'Pilote au casque spatial et à la combinaison lilas. Apparence uniquement.',price:2000,level:6},
+  {id:'pilot-idris',type:'pilot',target:'idris',name:'Idris Sol',description:'Pilote exclusif au casque doré. Apparence uniquement.',price:4500,level:10,achievement:'career-150'},
+  {id:'chair-vector',type:'chair',target:'vector',name:'Vector',description:'Châssis à double aileron. Stats : 8 / 8 / 8 / 5 / 6 = 35.',price:2600,level:7},
+  {id:'chair-nomad',type:'chair',target:'nomad',name:'Nomad',description:'Quatre grandes roues et pare-buffle. Stats : 7 / 6 / 6 / 9 / 7 = 35.',price:4500,level:10,achievement:'cup-winner'},
+  {id:'title-rookie',type:'title',name:'Étoile montante',description:'Titre public sous ton pseudo dans le salon.',price:600,level:3},
+  {id:'title-champion',type:'title',name:'Champion du club',description:'Un titre pour les vainqueurs de tournoi.',price:1800,level:7,achievement:'cup-winner'},
+  {id:'title-legend',type:'title',name:'Légende 200cc',description:'Le titre exclusif de la carrière complète.',price:5000,level:12,achievement:'career-master'},
+];
+shopItems.push(
+  {id:'chair-apex',type:'chair',target:'apex',name:'Apex F1',description:'Monoplace électrique : 10 vitesse / 10 accélération / 9 maniabilité / 3 hors-piste / 3 poids. 35 points.',price:7000,level:12,achievement:'expert-racer'},
+  {id:'pilot-hawking',type:'pilot',target:'hawking',name:'Stephen Hawking',description:'Le pilote ultime. Réservé à une maîtrise complète des catégories et des circuits. Apparence uniquement.',price:25000,level:25,achievement:'ultimate-master'}
+);
+export const achievements = [
+  {id:'first-finish',name:'Premiers tours',description:'Terminer 5 courses.',metric:'races',goal:5,coins:40,xp:100},
+  {id:'first-win',name:'Tout devant',description:'Gagner 5 courses.',metric:'wins',goal:5,coins:60,xp:150},
+  {id:'regular',name:'Habitué du paddock',description:'Terminer 30 courses.',metric:'races',goal:30,coins:120,xp:350},
+  {id:'veteran',name:'Inarrêtable',description:'Terminer 150 courses.',metric:'races',goal:150,coins:400,xp:1000},
+  {id:'explorer',name:'Tour du monde',description:'Gagner une course sur chacun des cinq circuits. Débloque l’achat de Direction fine.',metric:'winningCircuits',goal:5,coins:150,xp:250},
+  {id:'cup-winner',name:'La coupe à la maison',description:'Gagner 5 tournois. Débloque Or du champion, Nomad et Champion du club.',metric:'cups',goal:5,coins:200,xp:400},
+  {id:'career-150',name:'Pilote d’élite',description:'Remporter 3 fois la coupe de carrière 150cc. Débloque l’achat d’Idris Sol.',metric:'career150',goal:3,coins:250,xp:600},
+  {id:'career-master',name:'Une légende est née',description:'Remporter les quatre catégories de carrière. Débloque Légende 200cc.',metric:'career',goal:4,coins:400,xp:1200},
+];
+achievements.push(
+  {id:'podium-regular',name:'Sur la boîte',description:'Obtenir 25 podiums en course.',metric:'podiums',goal:25,coins:100,xp:400},
+  {id:'expert-racer',name:'Licence Superpilote',description:'Gagner 20 courses en 150cc ou 200cc avec les nouvelles IA. Débloque l’achat de l’Apex F1.',metric:'expertWins',goal:20,coins:250,xp:800},
+  {id:'elite-racer',name:'Chasseur 200cc',description:'Gagner 15 courses en 200cc avec les nouvelles IA.',metric:'eliteWins',goal:15,coins:250,xp:800},
+  {id:'perfect-cup',name:'Grand chelem',description:'Gagner les cinq manches d’un tournoi 150cc ou 200cc avec les nouvelles IA.',metric:'perfectCups',goal:1,coins:200,xp:600},
+  {id:'elite-champion',name:'Le patron du 200cc',description:'Gagner 5 tournois 200cc avec les nouvelles IA.',metric:'eliteCups',goal:5,coins:350,xp:1200},
+  {id:'ultimate-master',name:'Maître de l’espace-temps',description:'Réussir les cinq objectifs de maîtrise ci-dessous. Débloque l’achat de Stephen Hawking.',goal:5,coins:800,xp:2000,
+   requirements:[{metric:'eliteWins',goal:50,label:'Victoires en 200cc (nouvelles IA)'},{metric:'eliteCups',goal:10,label:'Tournois gagnés en 200cc (nouvelles IA)'},{metric:'eliteCircuits',goal:5,label:'Circuits gagnés en 200cc (nouvelles IA)'},{metric:'perfectCups',goal:3,label:'Grands chelems 150/200cc (nouvelles IA)'},{metric:'career',goal:4,label:'Catégories de carrière remportées'}]}
+);
+export function achievementProgress(achievement,metrics) {
+  return achievement.requirements ? achievement.requirements.filter(r=>(metrics[r.metric]||0)>=r.goal).length : metrics[achievement.metric]||0;
+}
+export function levelProgress(xp) {
+  const level=Math.floor((1+Math.sqrt(1+8*Math.max(0,xp)/250))/2);
+  const floor=250*(level-1)*level/2,next=250*level*(level+1)/2;
+  return {level,current:xp-floor,required:next-floor,next};
+}
+export function raceReward(place,difficulty='100') {
+  const multiplier=({'50':1,'100':1.15,'150':1.35,'200':1.6})[difficulty] || 1;
+  return {coins:Math.round((10+(12-place)*4)*multiplier),xp:Math.round((70+(12-place)*12)*multiplier)};
+}
+export function cupReward(place,difficulty='100') {
+  const multiplier=({'50':1,'100':1.15,'150':1.35,'200':1.6})[difficulty] || 1;
+  return {coins:Math.round((50+(12-place)*8+(place===1?30:0))*multiplier),xp:Math.round((300+(12-place)*35)*multiplier)};
+}
+export function itemFor(type,target) {return shopItems.find(i=>i.type===type&&i.target===target);}
+export function ownsSelection(progression,type,target) {
+  const item=itemFor(type,target);return !item || Boolean(progression?.owned.includes(item.id));
+}
+export function paintChair(chair,paintId) {
+  const paint=shopItems.find(i=>i.type==='paint'&&i.id===paintId);
+  return paint ? {...chair,color:paint.color} : chair;
+}

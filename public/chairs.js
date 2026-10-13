@@ -7,6 +7,9 @@ export const silhouettes = {
   atlas: { label: 'Châssis large · arceau renforcé', width: 1.4, length: 1.7, back: 1.2, wheel: .48 },
   drift: { label: 'Roues inclinées · châssis ouvert', width: 1.05, length: 1.4, back: .9, wheel: .52 },
   trail: { label: 'Six roues crantées · garde au sol haute', width: 1.25, length: 1.85, back: 1.1, wheel: .49 },
+  apex: { label:'Monoplace électrique · ailes avant et arrière',width:1.08,length:2.1,back:.78,wheel:.36 },
+  vector: { label: 'Double aileron · cockpit fuselé', width:1.12,length:1.65,back:.94,wheel:.43 },
+  nomad: { label: 'Quatre grandes roues · pare-buffle', width:1.3,length:1.8,back:1.12,wheel:.46 },
   pulse: { label: 'Châssis compact · batteries latérales', width: .98, length: 1.35, back: 1.0, wheel: .38 },
 };
 
@@ -61,7 +64,7 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
     box('arm-support', [.07, .4, .07], [side * .51, .94, .23], metal);
     box('headlight', [.16, .10, .04], [side * .36, .53, -spec.length / 2 - .03], lamp);
   }
-  const wheelZ = chair.id === 'trail' ? [-.62, 0, .62] : [.27];
+  const wheelZ = chair.id === 'trail' ? [-.62, 0, .62] : chair.id === 'nomad' ? [-.64,.64] : chair.id === 'apex' ? [-.8,.66] : [.27];
   for (const side of [-1, 1]) for (const z of wheelZ) {
     const wheel = new THREE.Group();
     wheel.name = 'drive-wheel'; wheel.position.set(side * (spec.width / 2 + .12), spec.wheel, z);
@@ -86,14 +89,38 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
     }
     group.add(wheel);
   }
-  if (chair.id !== 'trail') for (const side of [-1, 1]) {
+  if (!['trail','nomad','apex'].includes(chair.id)) for (const side of [-1, 1]) {
     const pivot = new THREE.Group(); pivot.name = 'caster-pivot'; pivot.position.set(side * .45, .18, -.72);
     const caster = new THREE.Group(); caster.name = 'caster'; caster.userData.radius = .18;
     const tyre = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, .13, 16), dark); tyre.rotation.z = Math.PI / 2; caster.add(tyre);
     const hub = new THREE.Mesh(new THREE.CylinderGeometry(.065, .065, .14, 12), metal); hub.rotation.z = Math.PI / 2; caster.add(hub);
     pivot.add(caster); group.add(pivot);
   }
-  if (chair.id === 'comet') {
+  if (chair.id === 'apex') {
+    box('f1-nose',[.38,.22,.95],[0,.58,-.93],paint).rotation.x=-.12;
+    box('f1-front-wing',[1.9,.07,.35],[0,.30,-1.42],paint);
+    box('f1-front-wing-flap',[1.65,.06,.18],[0,.39,-1.35],metal);
+    box('f1-rear-wing',[1.8,.085,.36],[0,1.10,.95],paint);
+    for(const side of [-1,1]) {
+      box('f1-wing-support',[.05,.55,.07],[side*.35,.82,.94],metal);
+      box('f1-endplate',[.055,.28,.40],[side*.89,1.09,.95],paint);
+      box('f1-sidepod',[.28,.3,.85],[side*.62,.6,.02],paint);
+      box('f1-intake',[.23,.18,.05],[side*.62,.61,-.42],dark);
+      box('f1-front-endplate',[.045,.19,.42],[side*.94,.36,-1.42],paint);
+      limb('f1-suspension',[side*.42,.49,-.45],[side*.72,.36,-.8],.035,metal);
+    }
+    box('f1-center-stripe',[.07,.015,.88],[0,.707,-.8],white);
+  } else if (chair.id === 'vector') {
+    for(const side of [-1,1]) {
+      box('vector-fin',[.10,.44,.7],[side*.62,.84,.54],paint).rotation.z=side*.24;
+      box('vector-light',[.025,.03,.85],[side*.60,.73,-.1],lamp);
+    }
+    box('vector-nose',[.62,.18,.6],[0,.67,-.7],paint).rotation.x=-.3;
+  } else if (chair.id === 'nomad') {
+    box('nomad-bumper',[1.6,.19,.2],[0,.5,-1.05],metal);
+    for(const side of [-1,1])box('nomad-fender',[.3,.17,1.65],[side*.68,.98,0],paint);
+    box('nomad-case',[.7,.25,.34],[0,1.15,.8],dark);
+  } else if (chair.id === 'comet') {
     const nose = box('tapered-nose', [.83, .16, .63], [0, .64, -.65]); nose.rotation.x = -.22;
     box('rear-spoiler', [1.5, .09, .28], [0, .86, .85]);
   } else if (chair.id === 'atlas') {
@@ -160,11 +187,17 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
     oval('cap', [.275, .14, .25], [0, 2.09, .075], clothes);
     oval('cap-visor', [.245, .025, .17], [0, 2.05, -.20], paint);
   }
+  if (pilot.style === 'helmet') {
+    oval('helmet-shell',[.29,.20,.27],[0,2.06,.08],clothes);
+    box('helmet-visor',[.46,.115,.07],[0,1.97,-.177],metal);
+    for(const side of [-1,1])oval('helmet-ear',[.07,.10,.12],[side*.268,1.94,.06],trim);
+    box('helmet-stripe',[.06,.025,.35],[0,2.255,.05],trim);
+  }
   box('controller', [.16, .08, .23], [.52, 1.25, -.35], dark);
   limb('joystick', [.52, 1.30, -.37], [.52, 1.40, -.37], .025, metal);
   const body = new THREE.Group(); body.name = 'suspension-rig';
   const headRig = new THREE.Group(); headRig.name = 'head-rig'; headRig.position.set(0, 1.65, .08);
-  const headNames = /^(head$|hair|fringe|face|smile|ear|eye|glasses|ponytail|beard|bob|cap)/;
+  const headNames = /^(head$|hair|helmet|fringe|face|smile|ear|eye|glasses|ponytail|beard|bob|cap)/;
   const wheels = [], casters = [], eyes = [];
   // A separate pivot for each eye allows a subtle blink without deforming the face.
   for (const side of [-1, 1]) {

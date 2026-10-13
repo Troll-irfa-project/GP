@@ -14,6 +14,12 @@ try {
   await page.goto(url);
   await page.locator('#roomBrowser').waitFor();
   assert.equal(await page.locator('.room-card').count(),3);
+  await page.locator('#openCollection').click();
+  assert.equal(await page.locator('#shopGrid .shop-card').count(),15);
+  assert.equal(await page.locator('[data-item="paint-lagoon"]').isDisabled(),true);
+  await page.locator('#achievementsTab').click();
+  assert.equal(await page.locator('.achievement-card').count(),14);
+  await page.locator('#closeCollection').click();
   await page.locator('[data-career="50"]:enabled').waitFor();
   assert.equal(await page.locator('[data-career="100"]').isDisabled(),true);
   await page.locator('#openRecords').click();
@@ -58,5 +64,5 @@ try {
   assert.deepEqual(errors, []); assert.deepEqual(failed, []);
   await page.locator('#roomBrowser').waitFor();
   await page.locator('#logoutButton').click();await page.locator('#authScreen').waitFor();
-  console.log('Docker smoke OK: global records, career locks/private room, account/session, 3 rooms, 12 racers, local GLB assets, shaders, 3 selection screens, 1440/1024/390px, logout, no browser errors.');
+  console.log('Docker smoke OK: economy/shop/achievements, global records, career locks/private room, account/session, 3 rooms, 12 racers, local GLB assets, shaders, 3 selection screens, 1440/1024/390px, logout, no browser errors.');
 } finally { await browser.close(); }
