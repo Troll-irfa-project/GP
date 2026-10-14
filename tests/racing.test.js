@@ -12,7 +12,7 @@ for (const track of tracks) test(`twelve bots finish three laps on ${track.id} w
   });
   const offTime = racers.map(() => 0), longestOff = racers.map(() => 0);
   let elapsed = 0, maxDeviation = 0;
-  while (elapsed < 240 && racers.some(r => !r.finished)) {
+  while (elapsed < (track.cupId==='horizons'?600:240) && racers.some(r => !r.finished)) {
     elapsed += dt; stepRace(racers, course, chairs, dt, 3, elapsed);
     racers.forEach((r, i) => {
       assert.ok(Number.isFinite(r.x) && Number.isFinite(r.z));
@@ -80,7 +80,7 @@ test('five non-affine layouts have a straight finish, smooth bends and long stra
     assert.ok(Math.abs(before.tz - gate.tz) < 1e-8 && Math.abs(after.tz - gate.tz) < 1e-8);
     signatures.push(Array.from({length: 16}, (_, i) => { const p = pointAt(course, course.total * i / 16); return [p.tx.toFixed(2), p.tz.toFixed(2)]; }));
   }
-  assert.equal(new Set(signatures.map(s => JSON.stringify(s))).size, 5);
+  assert.equal(new Set(signatures.map(s => JSON.stringify(s))).size, 10);
 });
 
 test('laps require ordered checkpoints and directional crossings, not a distance counter', () => {

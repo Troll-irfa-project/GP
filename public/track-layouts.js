@@ -25,4 +25,9 @@ function roundCorners(points) {
   });
 }
 
+export function longLayout(points, targetLength) {
+  const rounded=roundCorners(points);
+  const length=rounded.reduce((n,p,i)=>n+Math.hypot(p[0]-rounded[(i+1)%rounded.length][0],p[1]-rounded[(i+1)%rounded.length][1]),0);
+  return rounded.map(p=>p.map(v=>v*targetLength/length));
+}
 export const trackLayouts = Object.fromEntries(Object.entries(layouts).map(([id, points]) => [id, roundCorners(points)]));

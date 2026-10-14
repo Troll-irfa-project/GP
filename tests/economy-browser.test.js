@@ -60,7 +60,7 @@ test('browser: shop, achievements, owned pilots/chairs, paint in 3D and persiste
     assert.equal(await page.locator('[data-item="pilot-hawking"]').isDisabled(),true);
     await buy('chair-apex');await page.locator('#closeCollection').click();await enterGarage(page);
     await page.locator('#chairTab').click();await page.locator('[data-chair="apex"]').click();
-    assert.deepEqual(await page.locator('[role="meter"]').evaluateAll(els=>els.map(el=>Number(el.getAttribute('aria-valuenow')))),[10,10,9,3,3]);
+    assert.deepEqual(await page.locator('[role="meter"]').evaluateAll(els=>els.map(el=>Number(el.getAttribute('aria-valuenow')))),[10,10,4]);
     await page.screenshot({path:'test-results/apex-f1-garage.png'});
     await page.locator('#garageRoomButton').click();await page.locator('#launchRace').click();
     await page.locator('#race').waitFor({state:'visible'});

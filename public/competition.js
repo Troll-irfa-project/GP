@@ -4,6 +4,11 @@ export const difficulties = [
   {id:'150', name:'150cc', label:'Expert', speed:1.45, corner:1.58, line:1.25, drift:1.2},
   {id:'200', name:'200cc', label:'Élite', speed:1.65, corner:1.8, line:1.45, drift:1.4},
 ];
+export const cups=[
+  {id:'classic',name:'Coupe Originale',trackIds:['neon','coast','metro','garden','orbit']},
+  {id:'horizons',name:'Coupe Horizons',trackIds:['canyon','glacier','volcano','jungle','harbor']}
+];
+export const cupById=id=>cups.find(c=>c.id===id)||cups[0];
 export const positionPoints = [15,12,10,9,8,7,6,5,4,3,2,1];
 export function careerProgress(wins) {
   const completed = difficulties.filter(d=>wins.includes(d.id)).map(d=>d.id);

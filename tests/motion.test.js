@@ -9,13 +9,13 @@ test('acceleration is linear, takes seconds, and clamps exactly to Vmax', () => 
     const chair = { speed, accel }, dt = 1 / 60;
     let v = 0;
     const maximum = topSpeed(chair);
-    const expectedStep = maximum / (7 - accel * .4) * dt;
+    const expectedStep = (2.2 + accel * .65) * dt;
     for (let tick = 0; tick < 60; tick++) {
       const next = driveSpeed(v, { gas: true }, chair, 1, 0, 1, dt);
       assert.ok(Math.abs(next - v - expectedStep) < 1e-10);
       v = next;
     }
-    assert.ok(v < maximum * .35, 'still accelerating after one second');
+    assert.ok(v < maximum * .42, 'still accelerating after one second');
     for (let tick = 60; tick < 400; tick++) v = driveSpeed(v, { gas: true }, chair, 1, 0, 1, dt);
     assert.equal(v, maximum);
     const braking = driveSpeed(v, { brake: true }, chair, 1, 0, 1, dt);

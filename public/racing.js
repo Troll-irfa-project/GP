@@ -1,5 +1,5 @@
 import { tyreFactor, pitZone } from './endurance.js';
-import { angleDelta, driveSpeed, steeringRate, topSpeed } from './motion.js';
+import { angleDelta, driveSpeed, steeringRate, topSpeed, lateralGrip } from './motion.js';
 import { difficulties } from './competition.js';
 import { gridSlot } from './game-config.js';
 
@@ -143,8 +143,8 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
   for (const ahead of [6, 12, 20, 28]) {
     const a = pointAt(course, n.along + ahead - 5), b = pointAt(course, n.along + ahead + 5);
     const angle = Math.abs(angleDelta(Math.atan2(a.tz, a.tx), Math.atan2(b.tz, b.tx)));
-    if (angle < .25) continue;
-    const turnSpeed = clamp(steeringRate(chair, 12) * 5.5 * tuning.corner / angle, 9, speedLimit);
+    if (angle < .08) continue;
+    const turnSpeed = Math.min(speedLimit, Math.sqrt(lateralGrip(chair) * 10 / angle) * Math.min(.97, .57 + tuning.corner * .21));
     speedLimit = Math.min(speedLimit, Math.sqrt(turnSpeed ** 2 + 20 * Math.max(0, ahead - lookahead)));
   }
   if (Math.abs(error) > .75) speedLimit = Math.min(speedLimit, 11*tuning.corner);
@@ -153,7 +153,7 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
   r.ai.driftCooldown=Math.max(0,(r.ai.driftCooldown || 0)-dt);
   const drift=Boolean(tuning.drift && r.ai.driftCooldown===0 && r.speed>10 && Math.abs(steer)>.25 && Math.abs(error)<.75 && errorFromRoad<course.width-2 && r.drift<tuning.drift);
   if(r.wasDrifting&&!drift)r.ai.driftCooldown=1.2;
-  if(drift)steer=clamp(angularSpeed/(steeringRate(chair,r.speed)*1.3),-1,1);
+  if(drift)steer=clamp(angularSpeed/(steeringRate(chair,r.speed)*1.08),-1,1);
   return { gas: true, brake: false, drift, steer, speedLimit };
 }
 
@@ -180,7 +180,7 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0, aft
     const chair = chairs.find(c => c.id === r.chairId);
     const n = nearest(course, r.x, r.z, r.isBot ? r.lastAlong : null);
     const input = r.isBot ? botInput(r, chair, course, n, racers, dt) : r.input || {};
-    const grip = n.distance <= course.width ? 1 : Math.min(1,Math.max(.35, chair.offroad / 10) * (r.upgradeId === 'module-grip' ? 1.02 : 1));
+    const grip = n.distance <= course.width ? 1 : Math.min(1, .55 * (r.upgradeId === 'module-grip' ? 1.02 : 1));
     r.speed = driveSpeed(r.speed, input, chair, grip, r.boost, r.isBot ? r.skill || 1 : 1, dt, r.upgradeId, r.itemBoost, r.slow, tyreFactor(r));
     const steer = input.steer ?? ((input.right ? 1 : 0) - (input.left ? 1 : 0));
     r.steer += (clamp(steer, -1, 1) - r.steer) * Math.min(1, dt * 12);
@@ -189,7 +189,7 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0, aft
     if (r.wasDrifting && !drifting && r.drift > .35) r.boost = Math.min(1.1, r.drift * .8);
     r.wasDrifting = drifting;
     // Players and AI share the same speed, grip and turning limits.
-    if (Math.abs(r.speed) > .15) r.heading += r.steer * steeringRate(chair, r.speed) * (r.upgradeId === 'module-turn' ? 1.015 : 1) * (drifting ? 1.3 : 1) * dt * Math.sign(r.speed);
+    if (Math.abs(r.speed) > .15) r.heading += r.steer * steeringRate(chair, r.speed) * (r.upgradeId === 'module-turn' ? 1.015 : 1) * (drifting ? 1.08 : 1) * dt * Math.sign(r.speed);
     r.heading = Math.atan2(Math.sin(r.heading), Math.cos(r.heading));
     r.x += Math.cos(r.heading) * r.speed * dt; r.z += Math.sin(r.heading) * r.speed * dt;
     r.boost = Math.max(0, r.boost - dt); r.boostCooldown = Math.max(0, r.boostCooldown - dt);
@@ -221,7 +221,7 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0, aft
     const dx = b.x - a.x, dz = b.z - a.z, distance = Math.hypot(dx, dz);
     if (distance >= 2.1) continue;
     const nx = distance > .001 ? dx / distance : 1, nz = distance > .001 ? dz / distance : 0;
-    const aw = chairs.find(c => c.id === a.chairId).weight, bw = chairs.find(c => c.id === b.chairId).weight;
+    const aw = 1, bw = 1; // Equal mass: no hidden fourth statistic.
     const total = aw + bw, overlap = 2.1 - distance;
     a.x -= nx * overlap * bw / total; a.z -= nz * overlap * bw / total;
     b.x += nx * overlap * aw / total; b.z += nz * overlap * aw / total;

@@ -1,8 +1,13 @@
 // Shared, deterministic helpers. Heading 0 points along world +X; models face local -Z.
 export const modelYaw = heading => -heading - Math.PI / 2;
 export const angleDelta = (from, to) => Math.atan2(Math.sin(to - from), Math.cos(to - from));
-export const topSpeed = chair => chair.speed * 2.4;
-export const steeringRate = (chair, speed) => (1.5 + chair.handling * .10) * (.3 + .7 * Math.min(1, Math.abs(speed) / 8));
+export const topSpeed = chair => 14 + chair.speed * 1.1;
+// Lateral acceleration = speed² / radius: fast chairs cannot turn on rails.
+export const lateralGrip = chair => 8 + chair.handling * 3.2;
+export const steeringRate = (chair, speed) => Math.min(
+  (1.5 + chair.handling * .10) * (.3 + .7 * Math.min(1, Math.abs(speed) / 8)),
+  lateralGrip(chair) / Math.max(3, Math.abs(speed))
+);
 
 export function approachSpeed(speed, target, acceleration, dt) {
   const step = acceleration * dt;
@@ -12,9 +17,8 @@ export function approachSpeed(speed, target, acceleration, dt) {
 export function driveSpeed(speed, input, chair, grip, boost, skill, dt, upgrade = null, itemBoost = 0, slow = 0, tyres = 1) {
   const top = topSpeed(chair) * grip * skill * (slow > 0 ? .8 : 1) * tyres;
   const target = input.brake ? -4 : input.gas ? Math.min(top * (boost > 0 ? 1.35 : itemBoost > 0 ? 1.2 : 1), input.speedLimit ?? Infinity) : 0;
-  // Equal increments per second: 0 -> Vmax in 3.0–4.6 s for the current garage.
-  const secondsToTop = 7 - chair.accel * .4;
-  const acceleration = topSpeed(chair) / secondsToTop * (upgrade === 'module-start' ? 1.02 : 1);
+  // Linear acceleration independent of Vmax: low-speed chassis do not accelerate worse.
+  const acceleration = (2.2 + chair.accel * .65) * (upgrade === 'module-start' ? 1.02 : 1);
   const rate = input.brake ? 16 : !input.gas ? 5 : speed > target ? 13 : boost > 0 || itemBoost > 0 ? 18 : acceleration;
   return approachSpeed(speed, target, rate, dt);
 }

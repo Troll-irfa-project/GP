@@ -15,7 +15,7 @@ test('reduced rewards, raised prices, exact F1 stats and distinct F1 geometry',(
   assert.equal(shopItems.length,33);assert.equal(achievements.length,39);
   const hawking=shopItems.find(i=>i.id==='pilot-hawking');
   assert.ok(shopItems.filter(i=>i!==hawking).every(i=>i.price<hawking.price&&i.level<hawking.level));
-  const f1=chairs.find(c=>c.id==='apex');assert.deepEqual(['speed','accel','handling','offroad','weight'].map(k=>f1[k]),[10,10,9,3,3]);
+  const f1=chairs.find(c=>c.id==='apex');assert.deepEqual(['speed','accel','handling'].map(k=>f1[k]),[10,10,4]);
   const model=makeChair(THREE,f1);assert.ok(model.getObjectByName('f1-front-wing'));assert.ok(model.getObjectByName('f1-rear-wing'));
   assert.equal(model.userData.animation.wheels.length,4);
   const materials=new Set();model.traverse(o=>{o.geometry?.dispose();if(o.material)materials.add(o.material);});materials.forEach(m=>m.dispose());

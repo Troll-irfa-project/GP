@@ -9,15 +9,15 @@ export const shopItems = [
   {id:'module-turn',type:'upgrade',name:'Direction fine',description:'Vitesse de braquage +1,5 %. Un seul module équipé.',price:2400,level:8,achievement:'explorer',effect:'steering'},
   {id:'pilot-aurore',type:'pilot',target:'aurore',name:'Aurore Vega',description:'Pilote au casque spatial et à la combinaison lilas. Apparence uniquement.',price:2000,level:6},
   {id:'pilot-idris',type:'pilot',target:'idris',name:'Idris Sol',description:'Pilote exclusif au casque doré. Apparence uniquement.',price:4500,level:10,achievement:'career-150'},
-  {id:'chair-vector',type:'chair',target:'vector',name:'Vector',description:'Châssis à double aileron. Stats : 8 / 8 / 8 / 5 / 6 = 35.',price:2600,level:7},
-  {id:'chair-nomad',type:'chair',target:'nomad',name:'Nomad',description:'Quatre grandes roues et pare-buffle. Stats : 7 / 6 / 6 / 9 / 7 = 35.',price:4500,level:10,achievement:'cup-winner'},
+  {id:'chair-vector',type:'chair',target:'vector',name:'Vector',description:'Châssis à double aileron. Vitesse / accélération / maniabilité : 8 / 8 / 8 = 24.',price:2600,level:7},
+  {id:'chair-nomad',type:'chair',target:'nomad',name:'Nomad',description:'Quatre grandes roues et pare-buffle. Vitesse / accélération / maniabilité : 7 / 10 / 7 = 24.',price:4500,level:10,achievement:'cup-winner'},
   {id:'title-rookie',type:'title',name:'Étoile montante',description:'Titre public sous ton pseudo dans le salon.',price:600,level:3},
   {id:'title-champion',type:'title',name:'Champion du club',description:'Un titre pour les vainqueurs de tournoi.',price:1800,level:7,achievement:'cup-winner'},
   {id:'title-legend',type:'title',name:'Légende 200cc',description:'Le titre exclusif de la carrière complète.',price:5000,level:12,achievement:'career-master'},
 ];
 shopItems.push(...legendaryPilots.map(p=>({id:`pilot-${p.id}`,type:'pilot',target:p.id,name:p.name,description:p.description+' Apparence uniquement.',price:p.price,level:1,rarity:p.rarity,art:p.art,achievement:`legend-${p.id}`})));
 shopItems.push(
-  {id:'chair-apex',type:'chair',target:'apex',name:'Apex F1',description:'Monoplace électrique : 10 vitesse / 10 accélération / 9 maniabilité / 3 hors-piste / 3 poids. 35 points.',price:7000,level:12,achievement:'expert-racer'},
+  {id:'chair-apex',type:'chair',target:'apex',name:'Apex F1',description:'Monoplace électrique : 10 vitesse / 10 accélération / 4 maniabilité. 24 points : freinage indispensable avant les virages.',price:7000,level:12,achievement:'expert-racer'},
   {id:'pilot-hawking',type:'pilot',target:'hawking',name:'Stephen Hawking',description:'Le pilote ultime. Réservé à une maîtrise complète des catégories et des circuits. Apparence uniquement.',price:25000,level:25,achievement:'ultimate-master'}
 );
 export const achievements = [
@@ -50,10 +50,10 @@ achievements.push(
 shopItems.push(
   {id:'title-distance',type:'title',name:'Longue distance',description:'Ton premier titre de pilote d’endurance.',price:800,level:4,achievement:'endurance-debut'},
   {id:'pilot-nora',type:'pilot',target:'nora',name:'Nora Flux',description:'Spécialiste des relais, casque turquoise. Apparence uniquement.',price:4000,level:10,achievement:'endurance-regular'},
-  {id:'chair-stint',type:'chair',target:'stint',name:'Stint GT',description:'Carénage longue distance. Stats : 8 / 7 / 7 / 7 / 6 = 35. Usure identique aux autres fauteuils.',price:6000,level:12,achievement:'endurance-winner'},
+  {id:'chair-stint',type:'chair',target:'stint',name:'Stint GT',description:'Carénage longue distance. Vitesse / accélération / maniabilité : 9 / 7 / 8 = 24. Usure identique aux autres fauteuils.',price:6000,level:12,achievement:'endurance-winner'},
   {id:'title-clockwork',type:'title',name:'Horloger des stands',description:'Titre gagné au pilotage pur en endurance.',price:3000,level:12,achievement:'endurance-pure'},
   {id:'pilot-sacha',type:'pilot',target:'sacha',name:'Sacha Volt',description:'Pilote du chaos, combinaison rouge et casque blanc. Apparence uniquement.',price:6500,level:14,achievement:'endurance-chaos'},
-  {id:'chair-relay',type:'chair',target:'relay',name:'Relay R',description:'Châssis atelier aux roues carénées. Stats : 7 / 8 / 8 / 6 / 6 = 35. Aucun avantage au QTE.',price:6500,level:14,achievement:'pit-perfect'}
+  {id:'chair-relay',type:'chair',target:'relay',name:'Relay R',description:'Châssis atelier aux roues carénées. Vitesse / accélération / maniabilité : 8 / 9 / 7 = 24. Aucun avantage au QTE.',price:6500,level:14,achievement:'pit-perfect'}
 );
 achievements.push(
   {id:'endurance-debut',name:'Quinze tours plus tard',description:'Terminer une course d’endurance. Débloque l’achat de Longue distance.',metric:'enduranceFinishes',goal:1,coins:50,xp:200},

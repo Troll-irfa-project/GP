@@ -79,7 +79,7 @@ export function createPortal(callbacks) {
     progression.newRace(state.lobby.raceId);
     const {lobby,racers}=state, host=racers.find(r=>r.id===lobby.hostId), me=racers.find(r=>r.id===id);
     $('#roomName').textContent=lobby.roomName; $('#roomCircuit').textContent=tracks.find(t=>t.id===lobby.trackId)?.name || '';
-    $('#roomBackdrop').style.backgroundImage=`linear-gradient(0deg,#07182edd,#09224477 55%,#071c3955),url('/assets/${lobby.trackId}-menu.png')`;
+    $('#roomBackdrop').style.backgroundImage=`linear-gradient(0deg,#07182edd,#09224477 55%,#071c3955),url('${tracks.find(t=>t.id===lobby.trackId)?.menuArt||`/assets/${lobby.trackId}-menu.png`}')`;
     const humans=racers.filter(r=>!r.isBot).length;
     $('#roomOccupancy').textContent=`${humans} JOUEUR${humans>1?'S':''} · ${racers.filter(r=>r.isBot).length} BOTS · 12 PLACES`;
     $('#roomHost').textContent=host?.name || '—';
@@ -101,7 +101,7 @@ export function createPortal(callbacks) {
     rooms(list){
       $('#roomCount').textContent=`${list.length} ROOMS DE TEST`;
       $('#roomCards').innerHTML=list.map(room=>{const track=tracks.find(t=>t.id===room.trackId),available=room.phase==='waiting'&&room.humans<room.capacity;
-        return `<article class="room-card"><div class="room-art" style="background-image:url('/assets/${room.trackId}-menu.png')"><span class="room-phase">${room.phase==='waiting'?'OUVERTE':room.phase==='countdown'?'DÉPART IMMINENT':'EN COURSE'}</span><b>${String(room.humans).padStart(2,'0')}<small> / ${room.capacity}</small></b></div><div class="room-card-body"><span class="section-kicker">${escapeHtml(track?.name || '')}</span><h2>${escapeHtml(room.name)}</h2><p>${room.mode==='endurance'?'Endurance · 15 tours':room.mode==='tournament'?'Tournoi · 5 circuits':'Course unique · 3 tours'} · ${escapeHtml(room.difficulty || '100')}cc<br>${room.humans} joueur${room.humans>1?'s':''} · ${room.bots} bots<br>Hôte : ${escapeHtml(room.host || 'le premier joueur')}</p><button class="primary" data-room="${room.id}" data-available="${available}" ${!online||!available?'disabled':''}>${available?'REJOINDRE':room.humans>=room.capacity?'COMPLÈTE':'EN COURSE'} <span>❯</span></button></div></article>`;}).join('');
+        return `<article class="room-card"><div class="room-art" style="background-image:url('${track?.menuArt||`/assets/${room.trackId}-menu.png`}')"><span class="room-phase">${room.phase==='waiting'?'OUVERTE':room.phase==='countdown'?'DÉPART IMMINENT':'EN COURSE'}</span><b>${String(room.humans).padStart(2,'0')}<small> / ${room.capacity}</small></b></div><div class="room-card-body"><span class="section-kicker">${escapeHtml(track?.name || '')}</span><h2>${escapeHtml(room.name)}</h2><p>${room.mode==='endurance'?'Endurance · 15 tours':room.mode==='tournament'?'Tournoi · 5 circuits':'Course unique · 3 tours'} · ${escapeHtml(room.difficulty || '100')}cc<br>${room.humans} joueur${room.humans>1?'s':''} · ${room.bots} bots<br>Hôte : ${escapeHtml(room.host || 'le premier joueur')}</p><button class="primary" data-room="${room.id}" data-available="${available}" ${!online||!available?'disabled':''}>${available?'REJOINDRE':room.humans>=room.capacity?'COMPLÈTE':'EN COURSE'} <span>❯</span></button></div></article>`;}).join('');
     },
     async bootstrap(){
       show('auth');$('#authSubmit').disabled=true;

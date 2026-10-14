@@ -7,7 +7,7 @@ import { distanceToRoute } from '../public/motion.js';
 import { tracks } from '../public/catalog.js';
 import { createCourse } from '../public/racing.js';
 
-test('five 3D themes, drift particles, turbo and bounded rendering resources', { timeout: 120000 }, async () => {
+test('five 3D themes, drift particles, turbo and bounded rendering resources', { timeout: 180000 }, async () => {
   const port = 8102, url = `http://127.0.0.1:${port}`;
   const server = await startTestServer(port);
   let browser;
@@ -29,12 +29,12 @@ test('five 3D themes, drift particles, turbo and bounded rendering resources', {
         const row = { track: root.userData.trackId, steer: player.userData.pose.steer, lean: player.userData.animation.lean, speed: player.userData.pose.speed, boost: player.userData.pose.boost, drift: player.userData.pose.drift, particles: sizes.filter(v => v > .01).length, calls: renderer.info.render.calls, triangles: renderer.info.render.triangles, geometries: renderer.info.memory.geometries, textures: renderer.info.memory.textures };
         const line = root.getObjectByName('finish-line');
         row.finishLine = { x: line.position.x, z: line.position.z, width: line.geometry.parameters.width };
-        row.footprints = root.userData.dressingFootprints;
+        row.footprints = [...root.userData.dressingFootprints,...(root.userData.horizonFootprints||[])];
         window.lastRender = row; window.renderHistory.push(row); if (window.renderHistory.length > 1000) window.renderHistory.shift();
       };
     });
     await mkdir('test-results', { recursive: true });
-    for (const track of ['coast', 'neon', 'metro', 'garden', 'orbit', 'coast']) {
+    for (const track of ['coast', 'neon', 'metro', 'garden', 'orbit', 'canyon','glacier','volcano','jungle','harbor', 'coast']) {
       if (await page.locator('#backButton').isVisible()) {await page.locator('#backButton').click();await enterGarage(page);}
       await page.locator('#circuitStep').click(); await page.locator(`[data-track="${track}"]`).click();
       await page.evaluate(() => { window.lastRender = null; window.renderHistory = []; });

@@ -14,7 +14,7 @@ const roomCount = Math.max(1,Math.min(20,Number.parseInt(process.env.ROOM_COUNT 
 const rooms = new RoomManager(accounts,roomCount), connections = new Map(), usersOnline = new Map();
 const attempts = new Map();
 const publicRoot = resolve(root,'public');
-const mime = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.glb':'model/gltf-binary','.ttf':'font/ttf','.json':'application/json; charset=utf-8'};
+const mime = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.glb':'model/gltf-binary','.ttf':'font/ttf','.json':'application/json; charset=utf-8'};
 
 function trustedOrigin(req, optional = false) {
   const expected = process.env.APP_ORIGIN || `${req.socket.encrypted ? 'https' : 'http'}://${req.headers.host}`;

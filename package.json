@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test tests/motion.test.js tests/racing.test.js tests/selection.test.js tests/animation.test.js tests/multiplayer.test.js tests/competition.test.js tests/economy.test.js tests/rebalance.test.js tests/items.test.js tests/items-network.test.js tests/endurance.test.js tests/endurance-persistence.test.js tests/legendary.test.js",
-    "test:browser": "node --test --test-concurrency=1 tests/browser.test.js tests/rendering.test.js tests/finish-browser.test.js tests/rooms-browser.test.js tests/competition-browser.test.js tests/economy-browser.test.js tests/items-browser.test.js tests/endurance-browser.test.js tests/legendary-browser.test.js"
+    "test": "node --test tests/motion.test.js tests/racing.test.js tests/selection.test.js tests/animation.test.js tests/multiplayer.test.js tests/competition.test.js tests/economy.test.js tests/rebalance.test.js tests/items.test.js tests/items-network.test.js tests/endurance.test.js tests/endurance-persistence.test.js tests/legendary.test.js tests/horizons.test.js",
+    "test:browser": "node --test --test-concurrency=1 tests/browser.test.js tests/rendering.test.js tests/finish-browser.test.js tests/rooms-browser.test.js tests/competition-browser.test.js tests/economy-browser.test.js tests/items-browser.test.js tests/endurance-browser.test.js tests/legendary-browser.test.js tests/horizons-browser.test.js"
   },
   "dependencies": {
     "three": "^0.170.0",

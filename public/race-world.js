@@ -43,11 +43,12 @@ function instances(root, geometry, material, transforms, name) {
 }
 
 function terrain(track, palette) {
-  const geometry = new THREE.PlaneGeometry(244, 244, 120, 120); geometry.rotateX(-Math.PI / 2);
+  const size=track.cupId==='horizons'?2*(Math.max(...track.route.map(p=>Math.hypot(...p)))+70):244;
+  const geometry = new THREE.PlaneGeometry(size, size, 120, 120); geometry.rotateX(-Math.PI / 2);
   const position = geometry.attributes.position, colors = [], grass = new THREE.Color(palette.ground), sand = new THREE.Color(palette.stone), dark = grass.clone().multiplyScalar(.79), light = grass.clone().lerp(new THREE.Color('#c5d97f'), .2);
   for (let i = 0; i < position.count; i++) {
     const x = position.getX(i), z = position.getZ(i), distance = distanceToRoute(x, z, track.route), r = Math.hypot(x, z);
-    const edge = islandEdge(x, z), y = groundHeight(track, x, z, distance);
+    const edge = track.cupId==='horizons'?size/2-25:islandEdge(x, z), y = groundHeight(track, x, z, distance);
     position.setY(i, y);
     const color = dark.clone().lerp(light, .45 + Math.sin(x * .13 + Math.cos(z * .05)) * .2 + Math.cos(z * .12) * .15);
     if (distance < track.width + 2.3 || r > edge - 10) color.lerp(sand, .72);
@@ -58,7 +59,7 @@ function terrain(track, palette) {
 }
 
 function sky(root, palette) {
-  const mesh = new THREE.Mesh(new THREE.SphereGeometry(370, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, uniforms: { top: { value: new THREE.Color(palette.sky) }, horizon: { value: new THREE.Color(palette.fog) } }, vertexShader: 'varying vec3 vP; void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}', fragmentShader: 'uniform vec3 top;uniform vec3 horizon;varying vec3 vP;void main(){float t=pow(clamp(normalize(vP).y+.06,0.,1.),.5);gl_FragColor=vec4(mix(horizon,top,t),1.);#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}' }));
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(800, 32, 16), new THREE.ShaderMaterial({ side: THREE.BackSide, depthWrite: false, uniforms: { top: { value: new THREE.Color(palette.sky) }, horizon: { value: new THREE.Color(palette.fog) } }, vertexShader: 'varying vec3 vP; void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}', fragmentShader: 'uniform vec3 top;uniform vec3 horizon;varying vec3 vP;void main(){float t=pow(clamp(normalize(vP).y+.06,0.,1.),.5);gl_FragColor=vec4(mix(horizon,top,t),1.);#include <tonemapping_fragment>\n#include <colorspace_fragment>\n}' }));
   // Shader chunks must begin at the start of a GLSL line.
   mesh.material.fragmentShader = mesh.material.fragmentShader.replace('#include <tonemapping_fragment>', '').replace(';#include', ';\n#include');
   mesh.name = 'gradient-sky'; root.add(mesh);

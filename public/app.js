@@ -100,7 +100,7 @@ function buildWorld() {
   const pmrem = new THREE.PMREMGenerator(renderer), studio = new RoomEnvironment();
   scene.environment = pmrem.fromScene(studio, .04).texture; scene.environmentIntensity = .32;
   studio.dispose(); pmrem.dispose();
-  camera = new THREE.PerspectiveCamera(54, 1, .1, 450);
+  camera = new THREE.PerspectiveCamera(54, 1, .1, 1100);
   scene.add(new THREE.HemisphereLight('#e7f4ff', '#657c87', 1.05));
   sun = new THREE.DirectionalLight('#fff0d7', 3.2); sun.castShadow = true;
   sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = sun.shadow.camera.bottom = -26;
@@ -114,7 +114,8 @@ function buildTrack(track = state.lobby.track) {
   if (environment) disposeObject(environment);
   builtTrack = track.id;
   const palette = raceThemes[builtTrack]; scene.fog.color.set(palette.fog);
-  const night = ['neon', 'metro'].includes(builtTrack); sun.color.set(night ? '#c6d8ff' : '#fff0d7'); sun.intensity = night ? 1.8 : 2.6;
+  scene.fog.near=track.cupId==='horizons'?170:110;scene.fog.far=track.cupId==='horizons'?650:260;
+  const night = ['neon', 'metro','volcano','harbor'].includes(builtTrack); sun.color.set(night ? '#c6d8ff' : '#fff0d7'); sun.intensity = night ? 1.8 : 2.6;
   environment = createRaceWorld(track, models); scene.add(environment);
   const points = track.route.map(p => p.join(',')).join(' ');
   const xs = track.route.map(p => p[0]), zs = track.route.map(p => p[1]);

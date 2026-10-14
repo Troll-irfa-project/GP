@@ -8,11 +8,11 @@ import { makeChair } from '../public/chairs.js';
 import { sceneryPlacements } from '../public/scenery.js';
 import { distanceToRoute } from '../public/motion.js';
 
-test('twenty-three cosmetic pilots and ten distinct chairs preserve the 35-point budget', () => {
+test('twenty-three cosmetic pilots and ten distinct chairs preserve the 24-point budget', () => {
   assert.equal(pilots.length, 23); assert.equal(chairs.length, 10);
   for (const c of chairs) {
-    const stats = ['speed', 'accel', 'handling', 'offroad', 'weight'].map(key => c[key]);
-    assert.equal(stats.reduce((a, b) => a + b), 35);
+    const stats = ['speed', 'accel', 'handling'].map(key => c[key]);
+    assert.equal(stats.reduce((a, b) => a + b), 24);
     assert.ok(stats.every(value => Number.isInteger(value) && value >= 1 && value <= 10));
   }
   for (const p of pilots) {

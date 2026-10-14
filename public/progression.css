@@ -17,3 +17,5 @@
 @media(min-width:901px) and (max-height:850px){.selection-screen{min-height:880px}.garage-content .selection-details h2{font-size:34px}}
 .pilot-card.locked{cursor:pointer}
 .pilot-card.locked.active:after{content:'◉'}
+.track-list{grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:clamp(180px,17vw,255px);overflow-x:auto;padding:8px 4px 14px;scroll-snap-type:x proximity;scrollbar-color:#ffe154 #142d4e}
+.track-card{scroll-snap-align:center}

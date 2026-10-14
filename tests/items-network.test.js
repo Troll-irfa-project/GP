@@ -11,7 +11,7 @@ test('real sockets: host option, shared loot and authoritative item activation',
       const ws=new WebSocket(server.url.replace('http','ws')+'/ws',{headers:{Cookie:account.cookie,Origin:server.url}});
       ws.on('message',raw=>messages.push(JSON.parse(raw.toString())));
       const c={ws,messages,send:data=>ws.send(JSON.stringify(data)),async wait(predicate,from=0){const until=Date.now()+15000;while(Date.now()<until){const found=messages.slice(from).find(predicate);if(found)return found;await new Promise(r=>setTimeout(r,25));}throw Error('No matching socket state');}};
-      clients.push(c);await c.wait(m=>m.type==='hello');c.send({type:'join_room',roomId:'room-1'});const joined=await c.wait(m=>m.type==='joined');c.id=joined.playerId;
+      clients.push(c);await c.wait(m=>m.type==='hello');c.send({type:'join_room',roomId:'room-1',chairId:'pulse'});const joined=await c.wait(m=>m.type==='joined');c.id=joined.playerId;
     }
     const [a,b]=clients;let mark=b.messages.length;
     b.send({type:'configure',itemsEnabled:true});await b.wait(m=>m.type==='error',mark);

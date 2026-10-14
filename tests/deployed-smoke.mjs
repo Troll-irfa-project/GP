@@ -24,7 +24,7 @@ try {
   assert.equal(await page.locator('[data-career="100"]').isDisabled(),true);
   await page.locator('#openRecords').click();
   await page.waitForFunction(()=>document.querySelector('#recordsStatus').textContent.startsWith('Un meilleur temps'));
-  assert.equal(await page.locator('#recordsTrack option').count(),5);
+  assert.equal(await page.locator('#recordsTrack option').count(),10);
   assert.equal(await page.locator('#recordsItems option').count(),2);
   await page.locator('#recordsMode').selectOption('endurance');assert.match(await page.locator('#recordsRaceTitle').textContent(),/15 TOURS/);
   await page.locator('#closeRecords').click();

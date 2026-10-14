@@ -1,3 +1,5 @@
+import { horizonTracks } from './horizons.js';
+import { decorateHorizons } from './horizon-scenery.js';
 import { distanceToRoute, angleDelta } from './motion.js';
 import { createCourse, pointAt } from './racing.js';
 import { groundHeight } from './environment-math.js';
@@ -12,11 +14,13 @@ export const raceThemes = {
   orbit: { sky: '#a1b4ed', fog: '#d0d8f9', ground: '#acc4d9', water: '#b3c9f5', stone: '#e2e2ef', trees: '#829ee1' },
 };
 
+for(const track of horizonTracks)raceThemes[track.id]=track.palette;
+
 // All solid decorative footprints are checked against the same route as physics.
 export function sceneryPlacements(track) {
   const placements = [];
   for (let i = 0; i < 36; i++) {
-    const angle = i * Math.PI * 2 / 36, radius = 83 + (i % 3) * 5;
+    const angle = i * Math.PI * 2 / 36, radius = track.cupId==='horizons'?Math.max(...track.route.map(p=>Math.hypot(...p)))+25:83+(i%3)*5;
     const x = Math.cos(angle) * radius, z = Math.sin(angle) * radius;
     if (distanceToRoute(x, z, track.route) > 8.6 + 5 + 2) placements.push({ x, z, radius: 5, angle, variant: i % 4, height: 4 + i % 5 });
   }
@@ -25,6 +29,7 @@ export function sceneryPlacements(track) {
 
 // Geometry is batched by material; GLB props preserve their original hierarchy.
 export function decorateTrack(THREE, root, track, models = new Map()) {
+  if(track.cupId==='horizons')return decorateHorizons(THREE,root,track);
   const theme = raceThemes[track.id], course = createCourse(track), batches = new Map(), transform = new THREE.Object3D();
   root.userData.timeUniforms = []; root.userData.animated = [];
   const shapes = {

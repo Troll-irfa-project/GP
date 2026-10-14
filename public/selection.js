@@ -5,7 +5,7 @@ import { ownsSelection, paintChair, itemFor, achievements, achievementProgress }
 import { MAX_RACERS } from './game-config.js';
 
 const $ = selector => document.querySelector(selector);
-const stats = [['Vitesse max.', 'speed'], ['Accélération', 'accel'], ['Maniabilité', 'handling'], ['Hors-piste', 'offroad'], ['Poids / impact', 'weight']];
+const stats = [['Vitesse max.', 'speed'], ['Accélération', 'accel'], ['Maniabilité', 'handling']];
 const themes = {
   coast: { label: 'GRAND PRIX DU LITTORAL', description: 'Soleil, embruns et virages serrés.', difficulty: 2, tip: 'Garde de la vitesse dans les grandes courbes. Anticipe le freinage avant les épingles.' },
   neon: { label: 'GRAND PRIX NOCTURNE', description: 'La ville s’illumine. La course aussi.', difficulty: 3, tip: 'Les longues lignes droites récompensent la vitesse. Prépare ta trajectoire avant chaque enchaînement.' },
@@ -13,7 +13,8 @@ const themes = {
   garden: { label: 'GRAND PRIX NATURE', description: 'Une parenthèse verte. À pleine vitesse.', difficulty: 2, tip: 'La piste est plus large : essaie plusieurs trajectoires et utilise toute la largeur dans les courbes.' },
   orbit: { label: 'GRAND PRIX CÉLESTE', description: 'La tête dans les nuages. Les yeux sur la piste.', difficulty: 4, tip: 'Un tour plus long et une piste étroite. La régularité vaut autant que la vitesse de pointe.' },
 };
-const orderedTracks = ['coast', 'neon', 'garden', 'metro', 'orbit'].map(id => tracks.find(t => t.id === id));
+for(const track of tracks.filter(t=>t.cupId==='horizons'))themes[track.id]={label:'COUPE HORIZONS',description:track.subtitle,difficulty:4,tip:'Longue distance : prépare le freinage avant les épingles, puis accélère une fois le fauteuil aligné.'};
+const orderedTracks = ['coast', 'neon', 'garden', 'metro', 'orbit', 'canyon','glacier','volcano','jungle','harbor'].map(id => tracks.find(t => t.id === id));
 const pad = n => String(n).padStart(2, '0');
 
 export function createSelection(onChange) {
@@ -26,8 +27,8 @@ export function createSelection(onChange) {
   function populate() {
     if (populated) return; populated = true;
     $('#pilots').innerHTML = pilots.map(p => `<button class="pilot-card ${p.rarity==='legendary'?'legendary':''}" data-pilot="${p.id}" aria-label="Choisir ${p.name}" aria-pressed="false"><span class="portrait" style="background-position:${(p.portrait || 0) % 4 * 100 / 3}% ${Math.floor((p.portrait || 0) / 4) * 100}%"></span><span class="card-name">${p.name}${p.rarity==='legendary'?'<small class="rarity-label">LÉGENDAIRE</small>':''}</span></button>`).join('');
-    $('#chairs').innerHTML = chairs.map(c => `<button class="chair-card" data-chair="${c.id}" aria-label="Choisir le fauteuil ${c.name}" aria-pressed="false"><img alt="" width="320" height="180"/><span class="card-name">${c.name}<small>${c.tag.toUpperCase()} · 35 POINTS</small></span></button>`).join('');
-    $('#tracks').innerHTML = orderedTracks.map(t => `<button class="track-card" data-track="${t.id}" aria-label="Choisir ${t.name}" aria-pressed="false"><img src="/assets/${t.id}-menu.png" alt="" width="320" height="180" loading="lazy"/><span class="card-name">${t.name}<small>3 TOURS · 12 PILOTES</small></span></button>`).join('');
+    $('#chairs').innerHTML = chairs.map(c => `<button class="chair-card" data-chair="${c.id}" aria-label="Choisir le fauteuil ${c.name}" aria-pressed="false"><img alt="" width="320" height="180"/><span class="card-name">${c.name}<small>${c.tag.toUpperCase()} · 24 POINTS</small></span></button>`).join('');
+    $('#tracks').innerHTML = orderedTracks.map(t => `<button class="track-card" data-track="${t.id}" aria-label="Choisir ${t.name}" aria-pressed="false"><img src="${t.menuArt||`/assets/${t.id}-menu.png`}" alt="" width="320" height="180" loading="lazy"/><span class="card-name">${t.name}<small>3 TOURS · 12 PILOTES</small></span></button>`).join('');
     $('#pilots').addEventListener('click', e => { const card = e.target.closest('[data-pilot]'); if (card) choose(card.dataset.pilot); });
     $('#chairs').addEventListener('click', e => { const card = e.target.closest('[data-chair]'); if (card) choose(card.dataset.chair); });
     $('#tracks').addEventListener('click', e => { const card = e.target.closest('[data-track]'); if (card) choose(card.dataset.track); });
@@ -86,7 +87,7 @@ export function createSelection(onChange) {
     $('#equippedChair').textContent = `${chair.name.toUpperCase()}${isChair ? ` / ${pilot.short.toUpperCase()}` : ''}`;
     $('#chairSpecialty').textContent = chair.tag.toUpperCase();
     $('#selectedStats').innerHTML = stats.map(([label, key]) => `<div class="stat-row"><span>${label}</span><div class="stat-track" role="meter" aria-label="${label}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${chair[key]}">${Array.from({ length: 10 }, (_, i) => `<i class="${i < chair[key] ? 'on' : ''}"></i>`).join('')}</div><strong>${chair[key]}/10</strong></div>`).join('');
-    $('#selectionNote').textContent = isChair ? '5 statistiques, 35 points pour chaque fauteuil. À toi de choisir le compromis.' : 'Le personnage change le style. Le fauteuil fait les performances.';
+    $('#selectionNote').textContent = isChair ? '3 statistiques, 24 points. Freine avant les virages : à haute vitesse, le rayon s’élargit.' : 'Le personnage change le style. Le fauteuil fait les performances.';
     if(previewLocked){
       const item=itemFor('pilot',pilot.id),a=achievements.find(a=>a.id===item.achievement);
       const earned=a&&progression?.earned.includes(a.id);
@@ -111,7 +112,7 @@ export function createSelection(onChange) {
     }
     $('#dockLabel').textContent = isTrack ? 'CHOISIS TON TERRAIN DE JEU' : isChair ? 'CHOISIS TON FAUTEUIL' : 'CHOISIS TON PERSONNAGE';
     const items = listFor(); $('#selectionCount').textContent = `${pad(items.findIndex(item => item.id === idFor()) + 1)} / ${pad(items.length)}`;
-    const background = `/assets/${isTrack ? trackId : 'coast'}-menu.png`;
+    const background = isTrack ? track.menuArt||`/assets/${trackId}-menu.png` : '/assets/coast-menu.png';
     if ($('#menuBackdrop').dataset.source !== background) { $('#menuBackdrop').style.backgroundImage = `url('${background}')`; $('#menuBackdrop').dataset.source = background; }
     $('#trackName').textContent = track.name; $('#trackKicker').textContent = theme.label;
     $('#trackDescription').textContent = theme.description; $('#trackTip').textContent = theme.tip;

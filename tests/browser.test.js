@@ -22,7 +22,7 @@ test('browser: art-directed selection, pilots, smooth motion, camera and replay'
     await page.locator('.pilot-card').first().waitFor();
     assert.equal(await page.locator('.chair-card').count(), 10);
     assert.equal(await page.locator('.pilot-card').count(), 23);
-    assert.equal(await page.locator('.track-card').count(), 5);
+    assert.equal(await page.locator('.track-card').count(), 10);
     await page.evaluate(() => document.fonts.ready);
     await mkdir('test-results', { recursive: true });
     await page.waitForTimeout(600);
@@ -32,7 +32,7 @@ test('browser: art-directed selection, pilots, smooth motion, camera and replay'
     await page.locator('#continueButton').click();
     assert.equal(await page.locator('#lobby').getAttribute('data-screen'), 'chair');
     const values = await page.locator('[role="meter"]').evaluateAll(els => els.map(el => Number(el.getAttribute('aria-valuenow'))));
-    assert.equal(values.reduce((a, b) => a + b), 35);
+    assert.equal(values.reduce((a, b) => a + b), 24);
     assert.ok(values.every(v => v >= 1 && v <= 10));
     await page.screenshot({ path: 'test-results/selection-chair.png' });
     await page.locator('#continueButton').click();

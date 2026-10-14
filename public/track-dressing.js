@@ -9,7 +9,7 @@ import { MAX_RACERS, gridSlot } from './game-config.js';
 // Colour-per-instance scenery: a whole race festival without one draw call per prop.
 export function dressCircuit(root, track, course, palette) {
   const night = ['neon', 'metro'].includes(track.id);
-  const accent = { coast: '#00b5ce', neon: '#ff59c8', metro: '#8ce6ed', garden: '#ffd145', orbit: '#aa8bff' }[track.id];
+  const accent = { coast: '#00b5ce', neon: '#ff59c8', metro: '#8ce6ed', garden: '#ffd145', orbit: '#aa8bff' }[track.id] || track.accent;
   const geometries = {
     box: new THREE.BoxGeometry(1, 1, 1), rounded: new RoundedBoxGeometry(1, 1, 1, 2, .12),
     sphere: new THREE.SphereGeometry(1, 12, 8), pole: new THREE.CylinderGeometry(1, 1, 1, 8),

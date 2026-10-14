@@ -62,6 +62,7 @@ export class Accounts {
     const enduranceColumns=this.db.prepare('PRAGMA table_info(race_results)').all().map(c=>c.name);
     for(const [column,definition] of [['race_mode',"TEXT NOT NULL DEFAULT 'race'"],['pit_stops','INTEGER NOT NULL DEFAULT 0'],['perfect_stops','INTEGER NOT NULL DEFAULT 0']])if(!enduranceColumns.includes(column))this.db.exec('ALTER TABLE race_results ADD COLUMN '+column+' '+definition);
     this.db.exec('CREATE TABLE IF NOT EXISTS endurance_records(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,track_id TEXT NOT NULL,items_enabled INTEGER NOT NULL,best_race_ms INTEGER NOT NULL,best_lap_ms INTEGER,PRIMARY KEY(user_id,track_id,items_enabled)); CREATE INDEX IF NOT EXISTS endurance_rank ON endurance_records(track_id,items_enabled,best_race_ms);');
+    if(!this.db.prepare('PRAGMA table_info(tournament_results)').all().some(c=>c.name==='cup_id'))this.db.exec("ALTER TABLE tournament_results ADD COLUMN cup_id TEXT NOT NULL DEFAULT 'classic'");
     this.economy = new Economy(this.db);
     this.economy.migrateBalance();
     this.economy.migrateLegends();
@@ -154,9 +155,9 @@ export class Accounts {
       WHERE r.track_id=? ${mode==='endurance'?`AND r.items_enabled=${itemsEnabled?1:0}`:''} AND r.${column}>0 ORDER BY r.${column},u.username_key LIMIT 50`).all(trackId);
     return {trackId, itemsEnabled, mode, races:read('best_race_ms'), laps:read('best_lap_ms')};
   }
-  recordTournament({id,userId,difficulty,mode,place,points,wonRaces=0,itemsEnabled=false}) {
+  recordTournament({id,userId,difficulty,mode,place,points,wonRaces=0,itemsEnabled=false,cupId='classic'}) {
     this.economy.transaction(()=>{
-      const inserted=this.db.prepare('INSERT OR IGNORE INTO tournament_results(tournament_id,user_id,difficulty,mode,place,points,created_at,won_races,balance_version,items_enabled) VALUES(?,?,?,?,?,?,?,?,3,?)').run(id,userId,difficulty,mode,place,points,Date.now(),wonRaces,itemsEnabled?1:0);
+      const inserted=this.db.prepare('INSERT OR IGNORE INTO tournament_results(tournament_id,user_id,difficulty,mode,place,points,created_at,won_races,balance_version,items_enabled,cup_id) VALUES(?,?,?,?,?,?,?,?,3,?,?)').run(id,userId,difficulty,mode,place,points,Date.now(),wonRaces,itemsEnabled?1:0,cupId);
       if(inserted.changes && points>0) {
         this.economy.grant(userId,'cup:'+id,'Tournoi terminé · #'+place,cupReward(place,difficulty));
         this.economy.checkAchievements(userId);
