@@ -1,3 +1,4 @@
+import { legendaryPilots } from './legendary-catalog.js';
 // Shared display rules. Currency, ownership and rewards are enforced by the server.
 export const shopItems = [
   {id:'paint-lagoon',type:'paint',name:'Lagon électrique',description:'Carrosserie turquoise et finitions nacrées.',price:500,level:2,color:'#21d9bd'},
@@ -14,6 +15,7 @@ export const shopItems = [
   {id:'title-champion',type:'title',name:'Champion du club',description:'Un titre pour les vainqueurs de tournoi.',price:1800,level:7,achievement:'cup-winner'},
   {id:'title-legend',type:'title',name:'Légende 200cc',description:'Le titre exclusif de la carrière complète.',price:5000,level:12,achievement:'career-master'},
 ];
+shopItems.push(...legendaryPilots.map(p=>({id:`pilot-${p.id}`,type:'pilot',target:p.id,name:p.name,description:p.description+' Apparence uniquement.',price:p.price,level:1,rarity:p.rarity,art:p.art,achievement:`legend-${p.id}`})));
 shopItems.push(
   {id:'chair-apex',type:'chair',target:'apex',name:'Apex F1',description:'Monoplace électrique : 10 vitesse / 10 accélération / 9 maniabilité / 3 hors-piste / 3 poids. 35 points.',price:7000,level:12,achievement:'expert-racer'},
   {id:'pilot-hawking',type:'pilot',target:'hawking',name:'Stephen Hawking',description:'Le pilote ultime. Réservé à une maîtrise complète des catégories et des circuits. Apparence uniquement.',price:25000,level:25,achievement:'ultimate-master'}
@@ -62,6 +64,116 @@ achievements.push(
   {id:'pit-perfect',name:'Mécanique de précision',description:'Réussir 10 arrêts sans erreur de QTE dans des endurances terminées. Débloque Relay R.',metric:'perfectPitStops',goal:10,coins:150,xp:500},
   {id:'endurance-master',name:'Maître du relais',description:'Gagner sur les cinq circuits en endurance et remporter 5 endurances en 200cc.',goal:2,coins:500,xp:1500,requirements:[{metric:'enduranceCircuits',goal:5,label:'Circuits gagnés en endurance'},{metric:'enduranceEliteWins',goal:5,label:'Victoires endurance 200cc'}]}
 );
+achievements.push(...[
+  {
+    "id": "legend-stevie",
+    "name": "Premier de la classe",
+    "metric": "podiums",
+    "goal": 30,
+    "description": "Obtenir 30 podiums en course. Débloque l’achat de Stevie.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-timmy",
+    "name": "Toujours de la partie",
+    "metric": "races",
+    "goal": 80,
+    "description": "Terminer 80 courses. Débloque l’achat de Timmy.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-coach",
+    "name": "École du chaos",
+    "metric": "itemHits",
+    "goal": 150,
+    "description": "Toucher 150 adversaires avec une échelle ou un revolver dans des courses terminées. Débloque l’achat de Le Coach.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-dan",
+    "name": "Ne jamais lâcher",
+    "metric": "wins",
+    "goal": 40,
+    "description": "Gagner 40 courses. Débloque l’achat de Lieutenant Dan.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-jake",
+    "name": "Terrain conquis",
+    "metric": "winningCircuits",
+    "goal": 5,
+    "description": "Gagner sur chacun des cinq circuits. Débloque l’achat de Jake Sully.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-philippe",
+    "name": "La belle échappée",
+    "metric": "pureCups",
+    "goal": 8,
+    "description": "Gagner 8 tournois sans objets. Débloque l’achat de Philippe.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-croizon",
+    "name": "Au-delà de la distance",
+    "metric": "enduranceWins",
+    "goal": 15,
+    "description": "Gagner 15 courses d’endurance. Débloque l’achat de Philippe Croizon.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-hector",
+    "name": "Dernier avertissement",
+    "metric": "itemWins",
+    "goal": 50,
+    "description": "Gagner 50 courses avec objets. Débloque l’achat de Hector Salamanca.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-bran",
+    "name": "Couronne des circuits",
+    "metric": "eliteCircuits",
+    "goal": 5,
+    "description": "Gagner sur les cinq circuits en 200cc. Débloque l’achat de Bran Stark.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-reeve",
+    "name": "Toujours plus haut",
+    "metric": "expertWins",
+    "goal": 35,
+    "description": "Gagner 35 courses en 150cc ou 200cc. Débloque l’achat de Christopher Reeve.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-xavier",
+    "name": "Maîtrise absolue",
+    "metric": "eliteCups",
+    "goal": 7,
+    "description": "Gagner 7 tournois en 200cc. Débloque l’achat de Professeur Xavier.",
+    "coins": 0,
+    "xp": 300
+  },
+  {
+    "id": "legend-schumacher",
+    "name": "La course parfaite",
+    "metric": "perfectCups",
+    "goal": 2,
+    "description": "Remporter les cinq manches de 2 tournois en 150cc ou 200cc. Débloque l’achat de Michael Schumacher.",
+    "coins": 0,
+    "xp": 300
+  }
+]);
 export function achievementProgress(achievement,metrics) {
   return achievement.requirements ? achievement.requirements.filter(r=>(metrics[r.metric]||0)>=r.goal).length : metrics[achievement.metric]||0;
 }

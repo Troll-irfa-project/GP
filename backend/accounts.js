@@ -64,6 +64,7 @@ export class Accounts {
     this.db.exec('CREATE TABLE IF NOT EXISTS endurance_records(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,track_id TEXT NOT NULL,items_enabled INTEGER NOT NULL,best_race_ms INTEGER NOT NULL,best_lap_ms INTEGER,PRIMARY KEY(user_id,track_id,items_enabled)); CREATE INDEX IF NOT EXISTS endurance_rank ON endurance_records(track_id,items_enabled,best_race_ms);');
     this.economy = new Economy(this.db);
     this.economy.migrateBalance();
+    this.economy.migrateLegends();
     this.prune();
   }
   prune() { this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now()); }

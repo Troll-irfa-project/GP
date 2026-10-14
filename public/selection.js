@@ -1,7 +1,7 @@
 import { chairs, pilots, tracks } from './catalog.js';
 import { silhouettes } from './chairs.js';
 import { createGarage } from './garage.js';
-import { ownsSelection, paintChair, itemFor } from './progression.js';
+import { ownsSelection, paintChair, itemFor, achievements, achievementProgress } from './progression.js';
 import { MAX_RACERS } from './game-config.js';
 
 const $ = selector => document.querySelector(selector);
@@ -18,22 +18,26 @@ const pad = n => String(n).padStart(2, '0');
 
 export function createSelection(onChange) {
   let screen = 'pilot', chairId = 'comet', pilotId = 'maya', trackId = 'coast', garage, ready = false, visible = true;
-  let progression = null;
+  let progression = null, previewPilotId = null;
   let populated = false, rosterSignature = '', trackLocked = false;
   const choices = () => ({ chairId, pilotId, trackId });
   const listFor = () => screen === 'pilot' ? pilots : screen === 'chair' ? chairs : orderedTracks;
-  const idFor = () => screen === 'pilot' ? pilotId : screen === 'chair' ? chairId : trackId;
+  const idFor = () => screen === 'pilot' ? (previewPilotId || pilotId) : screen === 'chair' ? chairId : trackId;
   function populate() {
     if (populated) return; populated = true;
-    $('#pilots').innerHTML = pilots.map(p => `<button class="pilot-card" data-pilot="${p.id}" aria-label="Choisir ${p.name}" aria-pressed="false"><span class="portrait" style="background-position:${(p.portrait || 0) % 4 * 100 / 3}% ${Math.floor((p.portrait || 0) / 4) * 100}%"></span><span class="card-name">${p.name}</span></button>`).join('');
+    $('#pilots').innerHTML = pilots.map(p => `<button class="pilot-card ${p.rarity==='legendary'?'legendary':''}" data-pilot="${p.id}" aria-label="Choisir ${p.name}" aria-pressed="false"><span class="portrait" style="background-position:${(p.portrait || 0) % 4 * 100 / 3}% ${Math.floor((p.portrait || 0) / 4) * 100}%"></span><span class="card-name">${p.name}${p.rarity==='legendary'?'<small class="rarity-label">LÉGENDAIRE</small>':''}</span></button>`).join('');
     $('#chairs').innerHTML = chairs.map(c => `<button class="chair-card" data-chair="${c.id}" aria-label="Choisir le fauteuil ${c.name}" aria-pressed="false"><img alt="" width="320" height="180"/><span class="card-name">${c.name}<small>${c.tag.toUpperCase()} · 35 POINTS</small></span></button>`).join('');
     $('#tracks').innerHTML = orderedTracks.map(t => `<button class="track-card" data-track="${t.id}" aria-label="Choisir ${t.name}" aria-pressed="false"><img src="/assets/${t.id}-menu.png" alt="" width="320" height="180" loading="lazy"/><span class="card-name">${t.name}<small>3 TOURS · 12 PILOTES</small></span></button>`).join('');
     $('#pilots').addEventListener('click', e => { const card = e.target.closest('[data-pilot]'); if (card) choose(card.dataset.pilot); });
     $('#chairs').addEventListener('click', e => { const card = e.target.closest('[data-chair]'); if (card) choose(card.dataset.chair); });
     $('#tracks').addEventListener('click', e => { const card = e.target.closest('[data-track]'); if (card) choose(card.dataset.track); });
+    for(const p of pilots.filter(p=>p.art)){
+      const portrait=document.querySelector(`[data-pilot="${p.id}"] .portrait`);
+      portrait.classList.add('legendary-art');portrait.style.backgroundImage=`url('${p.art}')`;portrait.style.backgroundPosition='';
+    }
     try {
       garage = createGarage($('#garagePreview'));
-      for(const pilot of pilots.filter(p=>p.portrait===null)) {
+      for(const pilot of pilots.filter(p=>p.portrait===null&&!p.art)) {
         const portrait=garage.thumbnails([chairs[0]],pilot).get(chairs[0].id);
         const card=document.querySelector(`[data-pilot="${pilot.id}"] .portrait`);
         card.style.backgroundImage=`url('${portrait}')`;card.style.backgroundSize='cover';card.style.backgroundPosition='center';
@@ -47,20 +51,24 @@ export function createSelection(onChange) {
   }
   function choose(id) {
     if (screen === 'track' && trackLocked) return;
-    if (['pilot','chair'].includes(screen) && !ownsSelection(progression,screen,id)) return;
+    if (screen === 'pilot' && !ownsSelection(progression,'pilot',id)) {
+      previewPilotId=id;render();return;
+    }
+    if (screen === 'chair' && !ownsSelection(progression,'chair',id)) return;
+    previewPilotId=null;
     if (screen === 'pilot') pilotId = id;
     else if (screen === 'chair') chairId = id;
     else trackId = id;
     onChange(choices()); render();
   }
   function show(next, focus = false) {
-    screen = next; render();
+    screen = next; if(next!=='pilot')previewPilotId=null; render();
     if (focus) document.querySelector(`#${next === 'pilot' ? 'pilots' : next === 'chair' ? 'chairs' : 'tracks'} .active`)?.focus({ preventScroll: true });
   }
   function render() {
     populate();
     const isTrack = screen === 'track', isChair = screen === 'chair';
-    const pilot = pilots.find(p => p.id === pilotId), chair = chairs.find(c => c.id === chairId), track = tracks.find(t => t.id === trackId), theme = themes[trackId];
+    const pilot = pilots.find(p => p.id === (screen==='pilot' ? previewPilotId || pilotId : pilotId)), chair = chairs.find(c => c.id === chairId), track = tracks.find(t => t.id === trackId), theme = themes[trackId];
     $('#lobby').dataset.screen = screen;
     $('#garageContent').classList.toggle('hidden', isTrack); $('#circuitContent').classList.toggle('hidden', !isTrack);
     $('#pilots').classList.toggle('hidden', screen !== 'pilot'); $('#chairs').classList.toggle('hidden', !isChair); $('#tracks').classList.toggle('hidden', !isTrack);
@@ -68,6 +76,10 @@ export function createSelection(onChange) {
     $('#selectionBack').classList.toggle('hidden', !isTrack); $('#nameField').classList.toggle('hidden', isTrack);
     $('#selectionTitle').innerHTML = isTrack ? 'CHOIX DU <em>CIRCUIT</em>' : isChair ? 'CHOIX DU <em>FAUTEUIL</em>' : 'CHOIX DU <em>PILOTE</em>';
     $('#continueButton').innerHTML = isChair ? 'CHOISIR LE CIRCUIT <span>❯</span>' : 'CHOISIR LE FAUTEUIL <span>❯</span>';
+    const previewLocked=screen==='pilot'&&!ownsSelection(progression,'pilot',pilot.id);
+    if(previewLocked)$('#continueButton').textContent='CONTINUER AVEC '+pilots.find(p=>p.id===pilotId).short.toUpperCase();
+    $('#garagePreview').dataset.previewPilot=pilot.id;
+    $('#garagePreview').dataset.previewOnly=String(previewLocked);
     $('#selectionKicker').textContent = isChair ? 'UNE MACHINE, TON STYLE' : 'LE GARAGE / PERSONNAGE';
     $('#selectionName').textContent = isChair ? chair.name : pilot.name;
     $('#selectionQuote').textContent = isChair ? silhouettes[chairId].label : pilot.role;
@@ -75,18 +87,25 @@ export function createSelection(onChange) {
     $('#chairSpecialty').textContent = chair.tag.toUpperCase();
     $('#selectedStats').innerHTML = stats.map(([label, key]) => `<div class="stat-row"><span>${label}</span><div class="stat-track" role="meter" aria-label="${label}" aria-valuemin="1" aria-valuemax="10" aria-valuenow="${chair[key]}">${Array.from({ length: 10 }, (_, i) => `<i class="${i < chair[key] ? 'on' : ''}"></i>`).join('')}</div><strong>${chair[key]}/10</strong></div>`).join('');
     $('#selectionNote').textContent = isChair ? '5 statistiques, 35 points pour chaque fauteuil. À toi de choisir le compromis.' : 'Le personnage change le style. Le fauteuil fait les performances.';
+    if(previewLocked){
+      const item=itemFor('pilot',pilot.id),a=achievements.find(a=>a.id===item.achievement);
+      const earned=a&&progression?.earned.includes(a.id);
+      $('#selectionQuote').textContent=(a ? `${earned?'✓':'🔒'} ${a.name} · ${Math.min(a.goal,achievementProgress(a,progression?.metrics||{}))}/${a.goal}. ${a.description.split(' Débloque')[0]}` : `Niveau ${item.level} requis.`) + ` Prix : ${item.price.toLocaleString('fr-FR')} Rush.`;
+      $('#selectionNote').textContent=`APERÇU UNIQUEMENT · Non acheté. Pilote équipé : ${pilots.find(p=>p.id===pilotId).name}. L’achat se fait en boutique.`;
+    }
     for (const [id, active] of [['pilotTab', !isChair], ['chairTab', isChair]]) { $(`#${id}`).classList.toggle('active', active); $(`#${id}`).setAttribute('aria-pressed', active); }
     for (const [id, active] of [['garageStep', !isTrack], ['circuitStep', isTrack]]) { $(`#${id}`).classList.toggle('current', active); if (active) $(`#${id}`).setAttribute('aria-current', 'step'); else $(`#${id}`).removeAttribute('aria-current'); }
-    for (const [kind, selected] of [['pilot', pilotId], ['chair', chairId], ['track', trackId]]) for (const card of document.querySelectorAll(`[data-${kind}]`)) {
+    for (const [kind, selected] of [['pilot', previewPilotId || pilotId], ['chair', chairId], ['track', trackId]]) for (const card of document.querySelectorAll(`[data-${kind}]`)) {
       const active = card.dataset[kind] === selected; card.classList.toggle('active', active); card.setAttribute('aria-pressed', active);
       if (kind === 'track') card.disabled = trackLocked;
       else {
         const locked=!ownsSelection(progression,kind,card.dataset[kind]);
-        card.disabled=locked;card.classList.toggle('locked',locked);
+        card.disabled=kind==='pilot'?false:locked;card.classList.toggle('locked',locked);
+        if(kind==='pilot')card.setAttribute('aria-label',`${locked?'Prévisualiser':'Choisir'} ${pilots.find(p=>p.id===card.dataset.pilot).name}${locked?' — non acheté':''}`);
         card.querySelector('.unlock-label')?.remove();
         if(locked) {
           const item=itemFor(kind,card.dataset[kind]);
-          const label=document.createElement('small');label.className='unlock-label';label.textContent=`BOUTIQUE · NIV. ${item.level}`;card.querySelector('.card-name').append(label);
+          const label=document.createElement('small');label.className='unlock-label';label.textContent=item.rarity==='legendary'?`${item.price.toLocaleString('fr-FR')} RUSH`:`BOUTIQUE · NIV. ${item.level}`;card.querySelector('.card-name').append(label);
         }
       }
     }
@@ -111,7 +130,7 @@ export function createSelection(onChange) {
   $('#garageStep').onclick = () => show('pilot'); $('#circuitStep').onclick = () => show('track');
   $('#continueButton').onclick = () => show(screen === 'pilot' ? 'chair' : 'track', true);
   $('#selectionBack').onclick = () => show('chair', true);
-  function move(direction) { const items = listFor().filter(i=>screen==='track'||ownsSelection(progression,screen,i.id)), index = items.findIndex(item => item.id === idFor()); choose(items[(index + direction + items.length) % items.length].id); const card = document.querySelector(`#${screen === 'pilot' ? 'pilots' : screen === 'chair' ? 'chairs' : 'tracks'} .active`); card?.focus({ preventScroll: true }); if (innerWidth <= 700) card?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); }
+  function move(direction) { const items = listFor().filter(i=>screen==='track'||screen==='pilot'||ownsSelection(progression,screen,i.id)), index = items.findIndex(item => item.id === idFor()); choose(items[(index + direction + items.length) % items.length].id); const card = document.querySelector(`#${screen === 'pilot' ? 'pilots' : screen === 'chair' ? 'chairs' : 'tracks'} .active`); card?.focus({ preventScroll: true }); card?.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' }); }
   $('#previousChoice').onclick = () => move(-1); $('#nextChoice').onclick = () => move(1);
   document.addEventListener('keydown', e => {
     if (!visible || e.target instanceof HTMLInputElement || e.repeat) return;
@@ -121,7 +140,7 @@ export function createSelection(onChange) {
   return {
     choices,
     setProgression(value) {progression=value;if(populated)render();},
-    setChoices(user) {chairId=user.chairId;pilotId=user.pilotId;render();},
+    setChoices(user) {if(user.pilotId!==pilotId)previewPilotId=null;chairId=user.chairId;pilotId=user.pilotId;render();},
     setMultiplayer(id,host) {if(trackId===id && trackLocked===!host)return;trackId=id;trackLocked=!host;render();if(trackLocked)$('#menuStatus').textContent='Le circuit est choisi par l’hôte du salon.';else $('#menuStatus').textContent='';},
     show,
     setVisible(value) { visible = value; garage?.setActive(value && screen !== 'track'); },

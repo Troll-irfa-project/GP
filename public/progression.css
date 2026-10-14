@@ -3,3 +3,17 @@
 @media(max-width:1150px){.shop-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:850px){.shop-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.progression-pass{gap:18px}.progression-pass button{width:100%}}
 @media(max-width:520px){.shop-grid{grid-template-columns:1fr}.progression-pass{padding:20px}.progression-pass>div{min-width:0;width:100%;flex:auto}.progression-pass #paddockXp{font-size:12px}.collection-summary{padding:20px;gap:12px}.collection-summary span{margin-left:0}.reward-history li{flex-direction:column;gap:6px;font-size:12px}.reward-toast{font-size:12px;padding:14px}.shop-card-body>p,.achievement-card p{min-height:0}.collection-tabs button{flex:1}}
+.pilot-list{grid-template-columns:none!important;grid-auto-flow:column;grid-auto-columns:clamp(125px,12vw,175px);overflow-x:auto;overscroll-behavior-x:contain;scroll-snap-type:x proximity;padding:8px 6px 14px;scrollbar-color:#e6c559 #112b4a}
+.pilot-list .pilot-card{scroll-snap-align:center;min-width:0}
+.pilot-card.legendary{border-color:#d8a946}
+.pilot-card.legendary.locked{opacity:.78}
+.rarity-label{display:block;font:9px Arial;letter-spacing:1.5px;color:#ffe28b;margin-top:4px}
+.portrait.legendary-art,.shop-emblem .legendary-art{background-size:400% auto;background-position:52% 10%;background-repeat:no-repeat}
+.shop-emblem .legendary-art{display:block;width:150px;height:85px;border-radius:8px}
+.shop-card.legendary{border-color:#d6a947;background:linear-gradient(150deg,#392e36,#10243d 45%)}
+.shop-card.legendary .shop-emblem{background:radial-gradient(ellipse at top,#786039,#15283e)}
+.shop-card.legendary .section-kicker{color:#ffe28b}
+@media(min-width:701px){.selection-screen{min-height:940px}.garage-content .selection-details h2{font-size:clamp(30px,2.8vw,42px)}}
+@media(min-width:901px) and (max-height:850px){.selection-screen{min-height:880px}.garage-content .selection-details h2{font-size:34px}}
+.pilot-card.locked{cursor:pointer}
+.pilot-card.locked.active:after{content:'◉'}

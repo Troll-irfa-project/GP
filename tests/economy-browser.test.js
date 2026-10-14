@@ -18,8 +18,8 @@ test('browser: shop, achievements, owned pilots/chairs, paint in 3D and persiste
     assert.equal(await page.locator('[data-item="paint-lagoon"]').isDisabled(),true);
     assert.equal(await page.locator('[data-item="module-start"]').isDisabled(),true);
     await page.locator('#closeCollection').click();await enterGarage(page);
-    assert.equal(await page.locator('[data-pilot="aurore"]').isDisabled(),true);
-    assert.equal(await page.locator('[data-pilot="hawking"]').isDisabled(),true);
+    assert.equal(await page.locator('[data-pilot="aurore"]').isDisabled(),false);
+    assert.equal(await page.locator('[data-pilot="hawking"]').isDisabled(),false);
     await page.locator('#chairTab').click();assert.equal(await page.locator('[data-chair="vector"]').isDisabled(),true);
     await page.locator('#garageRoomButton').click();await page.locator('#leaveRoomButton').click();
     db=new Accounts(join(server.directory,'test.sqlite'));
@@ -30,7 +30,7 @@ test('browser: shop, achievements, owned pilots/chairs, paint in 3D and persiste
     const buy=async id=>{await page.locator(`[data-item="${id}"][data-action="buy"]`).click();await page.locator(`[data-item="${id}"][data-action="equip"]`).waitFor();};
     for(const id of ['paint-lagoon','module-start','pilot-aurore','chair-vector','title-rookie'])await buy(id);
     for(const id of ['paint-lagoon','module-start','title-rookie']){await page.locator(`[data-item="${id}"]`).click();await page.waitForFunction(id=>document.querySelector(`[data-item="${id}"]`).textContent==='RETIRER',id);}
-    await page.locator('#achievementsTab').click();assert.equal(await page.locator('.achievement-card.earned').count(),7);
+    await page.locator('#achievementsTab').click();assert.equal(await page.locator('.achievement-card.earned').count(),11);
     await page.screenshot({path:'test-results/achievements-desktop.png',fullPage:true});
     await page.setViewportSize({width:390,height:844});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);

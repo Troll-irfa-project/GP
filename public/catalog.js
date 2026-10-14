@@ -1,3 +1,4 @@
+import { legendaryPilots } from './legendary-catalog.js';
 import { trackLayouts } from './track-layouts.js';
 export const chairs=[
  {id:'comet',name:'Comète',tag:'Vitesse',color:'#ff6b52',speed:10,accel:8,handling:6,offroad:4,weight:7},
@@ -27,6 +28,7 @@ pilots.push(
  {id:'sacha',name:'Sacha Volt',short:'Sacha',role:'Toujours là au dernier relais',color:'#f36256',skin:'#e9b18d',hair:'#4b2928',style:'helmet',portrait:null},
  {id:'idris',name:'Idris Sol',short:'Idris',role:'Le soleil au bout de la piste',color:'#efba49',skin:'#9c6849',hair:'#252630',style:'helmet',portrait:null}
 );
+pilots.push(...legendaryPilots);
 export const tracks=[
  {id:'neon',name:'Boucle Néon',subtitle:'Boulevards rapides et double chicane',hue:168,width:6.2,route:trackLayouts.neon},
  {id:'coast',name:'Côte Azur',subtitle:'Corniche, baie et virages en S',hue:196,width:6.0,route:trackLayouts.coast},

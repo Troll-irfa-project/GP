@@ -30,6 +30,13 @@ export class Economy {
       this.db.prepare('INSERT INTO economy_migrations VALUES(2)').run();
     });
   }
+  migrateLegends() {
+    if(this.db.prepare('SELECT 1 FROM economy_migrations WHERE id=3').get())return;
+    this.transaction(()=>{
+      for(const {id} of this.db.prepare('SELECT id FROM users').all())this.checkAchievements(id);
+      this.db.prepare('INSERT INTO economy_migrations VALUES(3)').run();
+    });
+  }
   transaction(fn) {
     this.db.exec('BEGIN IMMEDIATE');
     try {const value=fn();this.db.exec('COMMIT');return value;}catch(error){this.db.exec('ROLLBACK');throw error;}

@@ -1,6 +1,46 @@
 # Roll Rush
 
-Jeu de course 3D multijoueur : 12 concurrents, cinq circuits, dix fauteuils et onze personnages, comptes persistants.
+Jeu de course 3D multijoueur : 12 concurrents, cinq circuits, dix fauteuils et vingt-trois personnages, comptes persistants.
+
+## Pilotes légendaires
+
+Douze pilotes inspirés des visuels fournis, disponibles dans **Boutique → Pilotes légendaires** après leur succès dédié, contre des Rush gagnés en jeu. Achat permanent vérifié par le serveur, puis sélection au garage. Aucun bonus de performance. Portraits de référence et costumes 3D animés sont distincts : les modèles sont des adaptations stylisées, pas des scans des images.
+
+| Pilote | Rush |
+| --- | ---: |
+| Lieutenant Dan | 9000 |
+| Le Coach | 7000 |
+| Christopher Reeve | 18000 |
+| Bran Stark | 15000 |
+| Jake Sully | 10000 |
+| Hector Salamanca | 14000 |
+| Philippe Croizon | 12000 |
+| Philippe · Intouchables | 11000 |
+| Professeur Xavier | 19000 |
+| Timmy | 6000 |
+| Stevie | 5000 |
+| Michael Schumacher | 20000 |
+
+Stephen Hawking reste le déblocage ultime à 25 000 Rush avec ses conditions existantes. Les personnages sont compatibles avec tous les fauteuils, livrées et modes. La rangée du garage défile horizontalement ; les flèches parcourent tous les pilotes, même verrouillés. Un pilote non acheté est affiché en aperçu uniquement : continuer conserve le pilote équipé. Son objectif, sa progression et son prix apparaissent au garage.
+
+### Succès légendaires
+
+Chaque objectif ouvre l’achat du personnage et accorde 300 XP, une seule fois (aucun Rush bonus). Les prix restent inchangés. Les résultats enregistrés avant la mise à jour comptent, les achats antérieurs restent acquis.
+
+| Pilote | Objectif |
+| --- | --- |
+| stevie | Obtenir 30 podiums en course. |
+| timmy | Terminer 80 courses. |
+| coach | Toucher 150 adversaires avec une échelle ou un revolver dans des courses terminées. |
+| dan | Gagner 40 courses. |
+| jake | Gagner sur chacun des cinq circuits. |
+| philippe | Gagner 8 tournois sans objets. |
+| croizon | Gagner 15 courses d’endurance. |
+| hector | Gagner 50 courses avec objets. |
+| bran | Gagner sur les cinq circuits en 200cc. |
+| reeve | Gagner 35 courses en 150cc ou 200cc. |
+| xavier | Gagner 7 tournois en 200cc. |
+| schumacher | Remporter les cinq manches de 2 tournois en 150cc ou 200cc. |
 
 ## Lancement
 

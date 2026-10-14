@@ -1,3 +1,4 @@
+import { dressLegendary } from './legendary-models.js';
 import { RoundedBoxGeometry } from './vendor/RoundedBoxGeometry.js';
 import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
 
@@ -210,6 +211,7 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
     for(const side of [-1,1])box('endurance-suit-stripe',[.04,.38,.025],[side*.16,1.34,-.24],white);
     box('endurance-badge',[.12,.08,.035],[-.13,1.51,-.28],trim);
   }
+  dressLegendary({THREE,group,pilot,box,oval,limb,skin,clothes,hair,white,dark,metal,trim});
   box('controller', [.16, .08, .23], [.52, 1.25, -.35], dark);
   limb('joystick', [.52, 1.30, -.37], [.52, 1.40, -.37], .025, metal);
   const body = new THREE.Group(); body.name = 'suspension-rig';
