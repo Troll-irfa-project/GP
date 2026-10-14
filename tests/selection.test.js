@@ -9,7 +9,7 @@ import { sceneryPlacements } from '../public/scenery.js';
 import { distanceToRoute } from '../public/motion.js';
 
 test('twenty-three cosmetic pilots and ten distinct chairs preserve the 24-point budget', () => {
-  assert.equal(pilots.length, 23); assert.equal(chairs.length, 10);
+  assert.equal(pilots.length, 23); assert.equal(chairs.length, 11);
   for (const c of chairs) {
     const stats = ['speed', 'accel', 'handling'].map(key => c[key]);
     assert.equal(stats.reduce((a, b) => a + b), 24);

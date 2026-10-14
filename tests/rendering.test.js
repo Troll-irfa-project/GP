@@ -54,11 +54,12 @@ test('five 3D themes, drift particles, turbo and bounded rendering resources', {
     }
     const first = results[0], last = results.at(-1);
     assert.ok(last.textures <= first.textures + 6, 'track replay releases obsolete textures');
-    await page.keyboard.down('w'); await page.keyboard.down('ArrowRight'); await page.keyboard.down('Space');
+    await page.keyboard.down('w'); await page.keyboard.down('ArrowLeft'); await page.keyboard.down('Space');
+    // The human now starts on the right at the back: steer inward, not into the barrier.
     // Observe the real charge, not a wall-clock sleep that can miss the boost
     // threshold under GPU/CI load or during a collision on the starting straight.
     await page.waitForFunction(() => window.lastRender.drift > .5 && window.lastRender.particles > 0, undefined, { timeout: 5000 });
-    await page.keyboard.up('Space'); await page.keyboard.up('ArrowRight');
+    await page.keyboard.up('Space'); await page.keyboard.up('ArrowLeft');
     await page.waitForFunction(() => window.renderHistory.some(r => r.boost > .05 && r.particles > 0), undefined, { timeout: 5000 });
     await page.screenshot({ path: 'test-results/race-turbo-art.png' }); await page.keyboard.up('w');
     const animation = await page.evaluate(() => window.renderHistory);

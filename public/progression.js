@@ -177,6 +177,18 @@ achievements.push(...[
 // Existing achievement Rush rewards are tripled; XP and race/cup payouts stay unchanged.
 for(const achievement of achievements)if(!achievement.id.startsWith('legend-'))achievement.coins*=3;
 
+achievements.push(...['50','100','150','200'].map((difficulty,index)=>({
+  id:'horizons-'+difficulty,name:['Premier horizon','Explorateur sportif','Au-delà des frontières','Maître des Horizons'][index],
+  description:'Remporter la Coupe Horizons en carrière '+difficulty+'cc. Débloque '+['le titre Éclaireur','le module Freins céramique','le fauteuil Horizon GT','le titre Souverain des Horizons'][index]+'.',
+  metric:'horizons'+difficulty,goal:1,coins:[600,1200,2400,4000][index],xp:[300,500,900,1500][index]
+})));
+shopItems.push(
+  {id:'title-scout',type:'title',name:'Éclaireur',description:'Vainqueur Horizons 50cc.',price:800,level:1,achievement:'horizons-50'},
+  {id:'module-brake',type:'upgrade',name:'Freins céramique',description:'Freinage +2 %. Aucun gain de vitesse. Un seul module équipé.',price:2800,level:5,achievement:'horizons-100',effect:'braking'},
+  {id:'chair-horizon',type:'chair',target:'horizon',name:'Horizon GT',description:'Prototype à dérives dorées : 9 vitesse / 6 accélération / 9 maniabilité = 24 points.',price:7500,level:12,achievement:'horizons-150'},
+  {id:'title-horizons',type:'title',name:'Souverain des Horizons',description:'Vainqueur Horizons 200cc.',price:5000,level:12,achievement:'horizons-200'}
+);
+
 export function achievementProgress(achievement,metrics) {
   return achievement.requirements ? achievement.requirements.filter(r=>(metrics[r.metric]||0)>=r.goal).length : metrics[achievement.metric]||0;
 }

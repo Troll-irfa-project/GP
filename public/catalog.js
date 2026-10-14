@@ -11,6 +11,7 @@ export const chairs=[
  {id:'nomad',name:'Nomad',tag:'Exploration',color:'#f0b66b',speed:7,accel:10,handling:7},
  {id:'stint',name:'Stint GT',tag:'Endurance GT',color:'#35c9bd',speed:9,accel:7,handling:8},
  {id:'relay',name:'Relay R',tag:'Atelier course',color:'#ffad49',speed:8,accel:9,handling:7},
+ {id:'horizon',name:'Horizon GT',tag:'Grand tourisme',color:'#36d6d0',speed:9,accel:6,handling:9},
  {id:'apex',name:'Apex F1',tag:'Monoplace',color:'#f3394e',speed:10,accel:10,handling:4}
 ];
 // Appearance only: pilot choice never changes vehicle handling or performance.

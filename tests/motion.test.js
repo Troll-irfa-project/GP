@@ -73,7 +73,7 @@ test('models face their direction of travel and have distinct silhouettes', () =
       assert.ok(front.dot(new THREE.Vector3(Math.cos(heading), 0, Math.sin(heading))) > .999999);
     }
   }
-  assert.equal(signatures.size, 10);
+  assert.equal(signatures.size, 11);
 });
 
 test('tree crowns have clearance from straights, closing segment and corners', () => {

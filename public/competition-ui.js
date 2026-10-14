@@ -4,7 +4,7 @@ const esc = value => String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;
 const time = ms => `${Math.floor(ms/60000)}:${(ms/1000%60).toFixed(3).padStart(6,'0')}`;
 export function createCompetitionUI(callbacks, api) {
   const $ = id => document.getElementById(id);
-  $('roomCards').insertAdjacentHTML('afterend',`<section class="competition-hub"><div class="competition-heading"><div><span class="section-kicker">LE DÉFI SOLO / PROGRESSION SAUVEGARDÉE</span><h2>LA ROUTE DES CHAMPIONS.</h2><p>Remporte un tournoi de cinq courses au cumul des points pour débloquer la catégorie suivante.</p></div><button id="openRecords" class="secondary">CLASSEMENTS MONDIAUX ↗</button></div><div id="careerCards" class="career-cards"></div><p id="careerProgressNotice"></p><p>11 IA · 5 circuits · 3 tours par course. Quitter abandonne le tournoi en cours, mais conserve tes catégories gagnées.</p></section>`);
+  $('roomCards').insertAdjacentHTML('afterend',`<section class="competition-hub"><div class="competition-heading"><div><span class="section-kicker">LE DÉFI SOLO / PROGRESSION SAUVEGARDÉE</span><h2>LA ROUTE DES CHAMPIONS.</h2><p>Remporte un tournoi de cinq courses au cumul des points pour débloquer la catégorie suivante.</p></div><button id="openRecords" class="secondary">CLASSEMENTS MONDIAUX ↗</button></div><label>CHAMPIONNAT <select id="careerCup">${cups.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></label><div id="careerCards" class="career-cards"></div><p id="careerProgressNotice"></p><p>11 IA · 5 circuits · 3 tours par course. Quitter abandonne le tournoi en cours, mais conserve tes catégories gagnées.</p></section>`);
   $('roomGarageButton').insertAdjacentHTML('beforebegin',`<div class="competition-options"><label>FORMAT<select id="competitionMode"><option value="race">Course unique · 3 tours</option><option value="endurance">Endurance · 15 tours</option><option value="tournament">Tournoi · 5 circuits</option><option value="career" disabled>Carrière solo</option></select></label><label id="cupChoice">COUPE<select id="competitionCup">${cups.map(c=>`<option value="${c.id}">${c.name} · 5 circuits</option>`).join('')}</select></label><label>DIFFICULTÉ DES IA<select id="competitionDifficulty">${difficulties.map(d=>`<option value="${d.id}">${d.name} · ${d.label}</option>`).join('')}</select></label><label>OBJETS<select id="competitionItems"><option value="off">Sans objets · pilotage pur</option><option value="on">Avec objets · boîtes mystères</option></select></label><p>La vitesse de ton fauteuil reste identique. Seul le rythme des IA change.</p><p id="enduranceRules" class="hidden">15 tours · usure cumulée 1 %, 3 %, 6 %… (plafond 80 %). E prépare l’arrêt ; entre dans la bande cyan à droite après la ligne. QTE : une flèche par tour d’usure, erreur = séquence à recommencer. Pneus neufs et départ à 0. Récompenses course ×4. Limite : 30 min, puis 3 min après le premier.</p><p id="cupRoute" class="hidden"></p></div>`);
   $('roomRoster').insertAdjacentHTML('afterend','<div id="cupStandings" class="cup-standings hidden"></div>');
   $('resultRanking').insertAdjacentHTML('afterend','<div id="resultCup" class="cup-standings hidden"></div>');
@@ -12,13 +12,15 @@ export function createCompetitionUI(callbacks, api) {
   let user, data=[], itemData=[], enduranceData=[], enduranceItemData=[], online=false;
   function profile(value) {
     user=value;
-    $('careerProgressNotice').textContent=user?.career?.completed.length===4 ? '★ CARRIÈRE TERMINÉE — Les quatre coupes sont à toi !' : `${user?.career?.completed.length || 0} / 4 coupes remportées`;
+    const career=user?.careers?.[$('careerCup').value] || user?.career;
+    $('careerProgressNotice').textContent=career?.completed.length===4 ? '★ CARRIÈRE TERMINÉE — Les quatre coupes sont à toi !' : `${career?.completed.length || 0} / 4 coupes remportées`;
     $('careerCards').innerHTML=difficulties.map(d=>{
-      const won=user?.career?.completed.includes(d.id), unlocked=user?.career?.unlocked.includes(d.id) ?? d.id==='50';
+      const won=career?.completed.includes(d.id), unlocked=career?.unlocked.includes(d.id) ?? d.id==='50';
       return `<article class="career-card ${won?'won':''} ${!unlocked?'locked':''}"><span class="section-kicker">${won?'★ COUPE REMPORTÉE':unlocked?'À CONQUÉRIR':'CATÉGORIE VERROUILLÉE'}</span><h3>${d.name}</h3><p>${d.label}</p><button class="${unlocked?'primary':'secondary'}" data-career="${d.id}" ${!unlocked||!online?'disabled':''}>${won?'REJOUER':unlocked?'RELEVER LE DÉFI':'GAGNE LA COUPE PRÉCÉDENTE'}</button></article>`;
     }).join('');
   }
-  $('careerCards').onclick=e=>{const b=e.target.closest('[data-career]');if(b&&!b.disabled)callbacks.onCareer(b.dataset.career);};
+  $('careerCards').onclick=e=>{const b=e.target.closest('[data-career]');if(b&&!b.disabled)callbacks.onCareer(b.dataset.career,$('careerCup').value);};
+  $('careerCup').onchange=()=>profile(user);
   $('competitionCup').onchange=()=>callbacks.onConfigure({cupId:$('competitionCup').value});
   $('competitionItems').onchange=()=>callbacks.onConfigure({itemsEnabled:$('competitionItems').value==='on'});
   $('competitionMode').onchange=()=>callbacks.onConfigure({mode:$('competitionMode').value});

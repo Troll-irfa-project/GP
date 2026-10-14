@@ -103,7 +103,7 @@ function buildWorld() {
   camera = new THREE.PerspectiveCamera(54, 1, .1, 1100);
   scene.add(new THREE.HemisphereLight('#e7f4ff', '#657c87', 1.05));
   sun = new THREE.DirectionalLight('#fff0d7', 3.2); sun.castShadow = true;
-  sun.shadow.mapSize.set(2048, 2048); sun.shadow.camera.left = sun.shadow.camera.bottom = -26;
+  sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = sun.shadow.camera.bottom = -26;
   sun.shadow.camera.right = sun.shadow.camera.top = 26; sun.shadow.camera.near = 1; sun.shadow.camera.far = 115;
   sun.shadow.bias = -.0005; sun.shadow.normalBias = .05;
   scene.add(sun, sun.target); effects = createRaceEffects(scene);
@@ -137,7 +137,7 @@ function syncRacers(now, dt) {
     if (object && (object.userData.paintId !== (r.paintId || null) || object.userData.chairId !== r.chairId || object.userData.pilotId !== (r.pilotId || pilots[0].id))) { disposeObject(object); world.delete(r.id); object = null; }
     if (!object) {
       if (r.id === playerId && preparedChair?.userData.chairId === r.chairId && preparedChair.userData.pilotId === r.pilotId) { object = preparedChair; preparedChair = null; }
-      else object = makeChair(THREE, paintChair(state.chairs.find(c => c.id === r.chairId) || state.chairs[0],r.paintId), pilots.find(p => p.id === r.pilotId) || pilots[0], { race: true });
+      else object = makeChair(THREE, paintChair(state.chairs.find(c => c.id === r.chairId) || state.chairs[0],r.paintId), pilots.find(p => p.id === r.pilotId) || pilots[0], { race: true, rival: r.id !== playerId });
       object.userData.paintId = r.paintId || null;
       object.userData.pose = {};
       object.userData.isPlayer = r.id === playerId;
@@ -169,11 +169,26 @@ async function showRace() {
   catch (error) { returnToGarage(); $('#menuStatus').textContent = 'Impossible de charger les modèles 3D. Réessaie après rechargement.'; console.error(error); return; }
   if (race.classList.contains('hidden')) return;
   buildWorld(); buildTrack(); resize(); cameraReady = false; previousFrame = 0; effects.reset();
-  cancelAnimationFrame(raf); raf = requestAnimationFrame(draw3D);
+  cancelAnimationFrame(raf);
+  syncRacers(performance.now(),0);
+  if(renderer.compileAsync)await renderer.compileAsync(scene,camera);
+  if(race.classList.contains('hidden'))return;
+  lastShadowUpdate=0;frameAverage=16.7;qualitySample=performance.now();qualityFrames=0;
+  raf = requestAnimationFrame(draw3D);
 }
+let lastShadowUpdate=0, frameAverage=16.7, qualitySample=0, qualityFrames=0;
+const mapDots=new Map();
+let rankingMarkup='';
 function draw3D(now) {
   if (!state || race.classList.contains('hidden')) return;
   const dt = previousFrame ? Math.min(.05, (now - previousFrame) / 1000) : 1 / 60;
+  if(previousFrame && now-previousFrame<250){frameAverage=frameAverage*.97+(now-previousFrame)*.03;qualityFrames++;}
+  if(now-qualitySample>4000 && qualityFrames>60){
+    const cap=Math.min(devicePixelRatio,1.35), current=renderer.getPixelRatio();
+    const next=frameAverage>24?Math.max(.75,current-.15):frameAverage<17.5?Math.min(cap,current+.1):current;
+    if(Math.abs(next-current)>.01){renderer.setPixelRatio(next);resize();}
+    qualitySample=now;qualityFrames=0;
+  }
   previousFrame = now;
   syncRacers(now, dt);
   if(state.items?.enabled && !itemVisuals)itemVisuals=createItemVisuals(scene);
@@ -194,7 +209,7 @@ function draw3D(now) {
     if (!cameraReady) { camera.position.copy(cameraDesired); cameraReady = true; }
     else camera.position.lerp(cameraDesired, 1 - Math.exp(-10 * dt));
     camera.lookAt(cameraTarget);
-    sun.position.copy(object.position).add(sunOffset); sun.target.position.copy(object.position);
+    if(now-lastShadowUpdate>=1000/30){sun.position.copy(object.position).add(sunOffset); sun.target.position.copy(object.position);}
     // Racers between the chase camera and the player fade instead of hiding the action.
     for (const other of world.values()) {
       if (other === object) continue;
@@ -209,6 +224,9 @@ function draw3D(now) {
       other.visible = opacity >= .025;
     }
   }
+  // Refresh the shadow camera and its texture together at most 30 times/s.
+  renderer.shadowMap.autoUpdate=false;
+  if(now-lastShadowUpdate>=1000/30){renderer.shadowMap.needsUpdate=true;lastShadowUpdate=now;}
   renderer.render(scene, camera);
   if (object?.userData.pose.finished) {
     finishPresentedAt ??= now;
@@ -234,8 +252,15 @@ function updateRaceUi() {
   $('#raceClock').textContent = new Date(state.lobby.raceTime * 1000).toISOString().slice(14, 19) + '.' + Math.floor(state.lobby.raceTime * 10) % 10;
   if (finishPresentedAt === null) $('#countdown').textContent = state.lobby.countdown || '';
   if (state.lobby.deadline && !me?.finished) $('#raceStatus').textContent = `FIN DANS ${Math.max(0,Math.ceil(state.lobby.deadline-state.lobby.raceTime))} S`;
-  $('#ranking').innerHTML = sorted.map((r, i) => `<div class="rank ${r.id === playerId ? 'me' : ''}"><span>${String(i + 1).padStart(2, '0')} &nbsp; ${escapeHtml(r.name)}</span><small>${r.dnf ? 'ABANDON' : r.finished ? 'FINI' : `T${r.lap}`}</small></div>`).join('');
-  $('#raceMapDots').innerHTML = state.racers.map(r => `<circle cx="${r.x}" cy="${r.z}" r="${r.id === playerId ? 4 : 2.5}" fill="${r.id === playerId ? '#ffdf3c' : '#e9f8ff'}" stroke="#0e274b" stroke-width="1.2"/>`).join('');
+  const nextRanking = sorted.map((r, i) => `<div class="rank ${r.id === playerId ? 'me' : ''}"><span>${String(i + 1).padStart(2, '0')} &nbsp; ${escapeHtml(r.name)}</span><small>${r.dnf ? 'ABANDON' : r.finished ? 'FINI' : `T${r.lap}`}</small></div>`).join('');
+  if(nextRanking!==rankingMarkup){$('#ranking').innerHTML=nextRanking;rankingMarkup=nextRanking;}
+  const active=new Set();
+  for(const r of state.racers){
+    active.add(r.id);let dot=mapDots.get(r.id);
+    if(!dot){dot=document.createElementNS('http://www.w3.org/2000/svg','circle');dot.setAttribute('stroke','#0e274b');dot.setAttribute('stroke-width','1.2');mapDots.set(r.id,dot);$('#raceMapDots').append(dot);}
+    dot.setAttribute('cx',r.x);dot.setAttribute('cy',r.z);dot.setAttribute('r',r.id===playerId?4:2.5);dot.setAttribute('fill',r.id===playerId?'#ffdf3c':'#e9f8ff');
+  }
+  for(const [id,dot] of mapDots)if(!active.has(id)){dot.remove();mapDots.delete(id);}
   if (me?.finished && !result.classList.contains('hidden')) finish();
 }
 function finish() {
@@ -304,7 +329,7 @@ portal = createPortal({
   onSignedOut() {const old=socket;socket=null;old?.close();currentRoom=null;playerId=null;stopRace();portal.setOnline(false);},
   onProfile(user) {selection.setProgression(user?.progression || null);updateFavorite();},
   onJoin(roomId) {send('join_room',{roomId,...selection.choices()});},
-  onCareer(difficulty) {send('start_career',{difficulty,...selection.choices()});},
+  onCareer(difficulty,cupId) {send('start_career',{difficulty,cupId,...selection.choices()});},
   onConfigure(data) {send('configure',data);},
   onLeave:leaveRoom,onStart:launchRace,
   onGarage() {selection.setReady(socket?.readyState===1);selection.show('pilot');renderLobby();updateFavorite();},

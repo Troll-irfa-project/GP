@@ -77,8 +77,9 @@ export class Economy {
       eliteCups:this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND difficulty='200' AND balance_version>=2").get(id).n,
       circuits:this.db.prepare('SELECT COUNT(DISTINCT track_id) AS n FROM (SELECT track_id FROM records WHERE user_id=? UNION SELECT track_id FROM records_with_items WHERE user_id=?)').get(id,id).n,
       cups:this.db.prepare('SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND place=1 AND points>0').get(id).n,
-      career150:this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND difficulty='150' AND place=1 AND points>0").get(id).n,
-      career:this.db.prepare("SELECT COUNT(DISTINCT difficulty) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND place=1 AND points>0").get(id).n};
+      ...Object.fromEntries(['50','100','150','200'].map(d=>['horizons'+d,this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND cup_id='horizons' AND difficulty=? AND place=1 AND points>0").get(id,d).n])),
+      career150:this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND cup_id='classic' AND difficulty='150' AND place=1 AND points>0").get(id).n,
+      career:this.db.prepare("SELECT COUNT(DISTINCT difficulty) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND cup_id='classic' AND place=1 AND points>0").get(id).n};
   }
   checkAchievements(id) {
     const metrics=this.metrics(id);

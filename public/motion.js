@@ -19,7 +19,7 @@ export function driveSpeed(speed, input, chair, grip, boost, skill, dt, upgrade 
   const target = input.brake ? -4 : input.gas ? Math.min(top * (boost > 0 ? 1.35 : itemBoost > 0 ? 1.2 : 1), input.speedLimit ?? Infinity) : 0;
   // Linear acceleration independent of Vmax: low-speed chassis do not accelerate worse.
   const acceleration = (2.2 + chair.accel * .65) * (upgrade === 'module-start' ? 1.02 : 1);
-  const rate = input.brake ? 16 : !input.gas ? 5 : speed > target ? 13 : boost > 0 || itemBoost > 0 ? 18 : acceleration;
+  const rate = input.brake ? 16 * (upgrade === 'module-brake' && speed > 0 ? 1.02 : 1) : !input.gas ? 5 : speed > target ? 13 : boost > 0 || itemBoost > 0 ? 18 : acceleration;
   return approachSpeed(speed, target, rate, dt);
 }
 

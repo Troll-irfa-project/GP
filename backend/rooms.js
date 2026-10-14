@@ -45,7 +45,9 @@ export class RoomManager {
     while (room.racers.length < MAX_RACERS) room.racers.push(this.bot(room.racers.length));
     room.racers.forEach((r,i) => {
       r.input = {}; r.aiDifficulty=room.difficulty; r.skill = difficulties.find(d=>d.id===room.difficulty).speed * (.97+(i%6)*.012);
-      spawnRacer(r,i,courses.get(room.trackId)); resetRacerItems(r);resetEndurance(r,room.mode==='endurance');
+      const prior=room.cup?.gridOrder;
+      const gridIndex=prior?.includes(r.id)?prior.indexOf(r.id):r.isBot?room.racers.slice(0,i).filter(p=>p.isBot).length:MAX_RACERS-1-humans.indexOf(r);
+      spawnRacer(r,gridIndex,courses.get(room.trackId)); r.gridPosition=gridIndex+1; resetRacerItems(r);resetEndurance(r,room.mode==='endurance');
     });
   }
   broadcast(room) {
@@ -115,7 +117,7 @@ export class RoomManager {
         room.cup.round++;
       } else {
         this.reset(room);
-        room.cup = {id:randomUUID(),round:0,complete:false,entries:room.racers.map((r,seed)=>({id:r.id,userId:r.userId,name:r.name,seed,points:0,wins:0,time:0,lastPoints:0}))};
+        room.cup = {id:randomUUID(),round:0,complete:false,entries:room.racers.map((r,seed)=>({id:r.id,userId:r.userId,name:r.name,seed:r.gridPosition-1,points:0,wins:0,time:0,lastPoints:0}))};
       }
       room.trackId = cupById(room.cupId).trackIds[room.cup.round];
       this.reset(room,true);
@@ -126,8 +128,10 @@ export class RoomManager {
   career(client, data) {
     if (client.roomId) return this.error(client,'Quitte ta room avant de commencer une carrière.');
     const profile = this.accounts.profile(client.user.id);
-    if (!profile.career.unlocked.includes(data.difficulty)) return this.error(client,'Gagne le tournoi précédent pour débloquer cette catégorie.');
-    const room = {id:`career-${client.user.id}`,name:'Coupe Carrière',private:true,owner:client.user.id,mode:'career',difficulty:data.difficulty,members:new Map(),racers:[],trackId:tracks[0].id};
+    const cupId=data.cupId || 'classic';
+    if(!cups.some(c=>c.id===cupId))return this.error(client,'Coupe invalide.');
+    if (!(profile.careers?.[cupId] || profile.career).unlocked.includes(data.difficulty)) return this.error(client,'Gagne le tournoi précédent pour débloquer cette catégorie.');
+    const room = {id:`career-${client.user.id}`,name:'Coupe Carrière',private:true,owner:client.user.id,mode:'career',cupId,difficulty:data.difficulty,members:new Map(),racers:[],trackId:tracks[0].id};
     this.reset(room); this.rooms.set(room.id,room);
     this.join(client,{...data,roomId:room.id});
   }
@@ -135,6 +139,7 @@ export class RoomManager {
     if (room.phase !== 'racing') return;
     room.phase = 'results';
     if (room.cup) {
+      room.cup.gridOrder=[...room.racers].sort(compareRacers).map(r=>r.id);
       [...room.racers].sort(compareRacers).forEach((r,i)=>{
         const entry = room.cup.entries.find(e=>e.id===r.id);
         entry.lastPoints = r.dnf ? 0 : positionPoints[i];

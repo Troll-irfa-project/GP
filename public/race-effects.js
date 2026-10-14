@@ -42,11 +42,16 @@ export function createRaceEffects(scene) {
   };
 }
 
+let contactTexture;
 export function attachContactShadow(model) {
+  if(!contactTexture){
   const size = 64, canvas = document.createElement('canvas'); canvas.width = canvas.height = size;
   const ctx = canvas.getContext('2d'), gradient = ctx.createRadialGradient(32, 32, 5, 32, 32, 31);
   gradient.addColorStop(0, '#081624aa'); gradient.addColorStop(.5, '#08162455'); gradient.addColorStop(1, '#08162400'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, size, size);
   const texture = new THREE.CanvasTexture(canvas); texture.colorSpace = THREE.SRGBColorSpace;
+  contactTexture=texture;contactTexture.userData.shared=true;
+  }
+  const texture=contactTexture;
   const shadow = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 3.0), new THREE.MeshBasicMaterial({ map: texture, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 }));
   shadow.name = 'contact-shadow'; shadow.rotation.x = -Math.PI / 2; shadow.position.y = .012; model.add(shadow);
 }

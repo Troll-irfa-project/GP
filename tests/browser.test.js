@@ -20,7 +20,7 @@ test('browser: art-directed selection, pilots, smooth motion, camera and replay'
     await page.goto(url);
     await enterGarage(page);
     await page.locator('.pilot-card').first().waitFor();
-    assert.equal(await page.locator('.chair-card').count(), 10);
+    assert.equal(await page.locator('.chair-card').count(), 11);
     assert.equal(await page.locator('.pilot-card').count(), 23);
     assert.equal(await page.locator('.track-card').count(), 10);
     await page.evaluate(() => document.fonts.ready);

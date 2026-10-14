@@ -81,14 +81,34 @@ Dans un salon, choisir **Tournoi → Coupe Horizons**. L’hôte choisit la coup
 
 Les nouveaux circuits sont aussi accessibles en course unique et en endurance, avec ou sans objets, et possèdent leurs classements mondiaux. Sprint Horizons : limite 10 minutes, puis 120 secondes après le premier arrivé (dans cette limite). Les autres limites restent inchangées. Comptes, achats, monnaies, succès, carrière et records existants sont conservés.
 
+## Performances navigateur
+
+Modèles de course allégés (garage détaillé inchangé), surfaces des adversaires regroupées par rig d’animation, texture d’ombre de contact partagée, ombres 1024² actualisées à 30 Hz et précompilation des shaders des douze pilotes. La résolution interne s’ajuste progressivement à la charge (ratio 0,75 à 1,35, plafonné à la densité de l’écran). La simulation serveur reste à 60 Hz. Le classement est réécrit seulement s’il change ; les points de mini-carte sont réutilisés.
+
+Mesure reproductible : `node tests/performance-probe.mjs` (Chrome installé). `PERF_BASELINE=1` dans l’environnement rétablit uniquement les anciens budgets géométriques/ombres/matériaux via interception des réponses de test, sans modifier les fichiers. Les chiffres dépendent de la machine ; ce n’est pas une garantie de FPS.
+
 ## Compétitions
 
 - **Records mondiaux** : bouton dans le paddock, top 50 des meilleurs temps de course (trois tours) et de tour par circuit. Un record par pilote et par règlement, classements séparés course/tour et **avec/sans objets**. Les anciens records sont conservés. L’API GET `/api/leaderboards` est publique et ne renvoie que pseudos, rangs, circuits et chronos.
-- **Tournoi** : l’hôte sélectionne « Tournoi · 5 circuits » et la catégorie IA dans son salon. Cinq manches : Néon, Côte Azur, Métro, Jardin, Orbite. Même grille de 12 pilotes, trois tours par manche. L’hôte lance la manche suivante depuis le salon, une fois la manche terminée.
+- **Tournoi** : l’hôte sélectionne « Tournoi · 5 circuits », la Coupe Originale ou Horizons et la catégorie IA dans son salon. Même grille de 12 pilotes, trois tours par manche. L’hôte lance la manche suivante depuis le salon, une fois la manche terminée.
 - **Points** : 15, 12, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1. Un abandon rapporte 0. Égalités départagées par nombre de victoires, temps cumulé (600 s de pénalité par abandon), puis ordre initial sur la grille.
 - **Difficultés IA** : 50cc (club), 100cc (sport), 150cc (expert), 200cc (élite). Le plafond de vitesse des bots est multiplié respectivement par 1,06 / 1,25 / 1,45 / 1,65, avec une légère variation individuelle. Ils prennent des trajectoires intérieures, visent les plaques turbo, dépassent et chargent de vrais dérapages pour relancer. Leur rythme en virage et la durée des dérapages augmentent avec la catégorie. Il n’y a ni téléportation de progression ni rattrapage artificiel lié au joueur ; checkpoints et collisions restent validés par la physique. Les performances humaines restent identiques : les chronos sont donc regroupés entre catégories.
-- **Carrière** : tournoi privé contre 11 bots. Seule la catégorie 50cc est ouverte au départ. Une victoire au classement général débloque la suivante, jusqu’à 200cc. Finir deuxième, gagner une seule manche ou remporter une coupe multijoueur ne débloque pas une catégorie de carrière. Les coupes gagnées et déblocages sont sauvegardés côté serveur.
+- **Grille** : le premier humain rejoint la 12e place, le deuxième la 11e, etc. Les IA sont devant. Après la première manche d’un tournoi, la grille suit l’ordre d’arrivée de la manche précédente (abandons en dernier), jamais le classement cumulé.
+- **Carrière** : deux progressions indépendantes, Coupe Originale et Coupe Horizons, à choisir dans le paddock ; tournoi privé contre 11 bots. Seule la catégorie 50cc est ouverte au départ. Une victoire au classement général débloque la suivante, jusqu’à 200cc. Finir deuxième, gagner une seule manche ou remporter une coupe multijoueur ne débloque pas une catégorie de carrière. Les coupes gagnées et déblocages sont sauvegardés côté serveur.
 - **Fin de manche** : 60 secondes après le premier arrivé, avec un maximum de cinq minutes de course. Les pilotes encore en piste sont classés en abandon, derrière les arrivants et par progression. Aucun record n’est enregistré pour un abandon.
+
+### Récompenses Horizons
+
+Chaque première victoire **en carrière Horizons** débloque un succès (avec ou sans objets) et l’accès à un achat exclusif. Les catégories 50 → 100 → 150 → 200cc se débloquent côté serveur, indépendamment de la carrière Originale. Les salons multijoueurs restent libres de choisir leur catégorie, comme pour la Coupe Originale.
+
+| Victoire | Bonus immédiat | Achat débloqué |
+|---|---|---|
+| 50cc | 600 Rush + 300 XP | Éclaireur, titre, 800 Rush |
+| 100cc | 1 200 Rush + 500 XP | Freins céramique, +2 % de freinage, 2 800 Rush, niv. 5 |
+| 150cc | 2 400 Rush + 900 XP | Horizon GT, 9/6/9, 7 500 Rush, niv. 12 |
+| 200cc | 4 000 Rush + 1 500 XP | Souverain des Horizons, titre, 5 000 Rush, niv. 12 |
+
+Les bonus de succès ne sont versés qu’une fois. Aucun achat ni progrès existant n’est effacé.
 
 Les rooms et tournois en cours sont en mémoire : quitter sa carrière, se déconnecter ou redémarrer le serveur abandonne l’épreuve en cours. Les records et catégories déjà gagnées restent acquis. En multijoueur, un départ est remplacé par une IA ; l’humain présent depuis le plus longtemps devient hôte. Une IA relais ne gagne pas de progression pour le joueur parti.
 

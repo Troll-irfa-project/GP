@@ -4,6 +4,7 @@ import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
 
 // Authored model parts all use -Z as their forward axis (feet, face and headlights).
 export const silhouettes = {
+  horizon: {label:'Grand tourisme · doubles dérives dorées',width:1.26,length:1.95,back:.9,wheel:.44},
   comet: { label: 'Coque profilée · dossier bas', width: 1.05, length: 1.8, back: .85, wheel: .40 },
   atlas: { label: 'Châssis large · arceau renforcé', width: 1.4, length: 1.7, back: 1.2, wheel: .48 },
   drift: { label: 'Roues inclinées · châssis ouvert', width: 1.05, length: 1.4, back: .9, wheel: .52 },
@@ -33,11 +34,11 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
   const trim = new THREE.MeshStandardMaterial({ color: '#ffdc56', metalness: .4, roughness: .3 });
   const red = new THREE.MeshStandardMaterial({ color: '#ff5a63', emissive: '#fa233b', emissiveIntensity: .6 });
   function box(name, size, position, mat = paint) {
-    const mesh = new THREE.Mesh(new RoundedBoxGeometry(...size, 2, Math.min(...size) * .28), mat);
+    const mesh = new THREE.Mesh(new RoundedBoxGeometry(...size, options.race ? 1 : 2, Math.min(...size) * .28), mat);
     mesh.name = name; mesh.position.set(...position); group.add(mesh); return mesh;
   }
   function oval(name, size, position, mat) {
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), mat);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(1, options.race ? 12 : 20, options.race ? 8 : 14), mat);
     mesh.name = name; mesh.scale.set(...size); mesh.position.set(...position); group.add(mesh); return mesh;
   }
   function limb(name, from, to, radius, mat) {
@@ -47,6 +48,14 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize()); group.add(mesh); return mesh;
   }
   box('chassis', [spec.width, .28, spec.length], [0, .48, 0]);
+  if(chair.id==='horizon'){
+    box('horizon-front-splitter',[1.6,.07,.3],[0,.4,-1.05],metal);
+    for(const side of [-1,1]){
+      box('horizon-side-pod',[.28,.3,1.25],[side*.66,.62,.12]);
+      const fin=box('horizon-gold-fin',[.07,.52,.56],[side*.55,1.12,.73],new THREE.MeshStandardMaterial({color:'#ffd56a',metalness:.55,roughness:.32}));fin.rotation.z=side*-.15;
+    }
+    box('horizon-tail',[1.4,.08,.3],[0,1.38,.92],metal);
+  }
   box('seat', [.86, .16, .78], [0, .84, 0], dark);
   box('backrest', [.86, spec.back, .16], [0, .84 + spec.back / 2, .43], dark);
   box('back-shell', [.94, spec.back * .85, .10], [0, .84 + spec.back / 2, .54]);
@@ -233,9 +242,13 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
   body.add(headRig); group.add(body);
   group.userData.animation = { body, head: headRig, eyes, wheels, casters, speed: 0, steer: 0, pitch: 0, lean: 0, wheelTravel: 0 };
   if (options.race) {
-    for (const wheel of wheels) batchStaticMeshes(THREE, wheel);
-    for (const eye of eyes) batchStaticMeshes(THREE, eye);
-    batchStaticMeshes(THREE, headRig); batchStaticMeshes(THREE, body);
+    const originals=new Set();group.traverse(o=>{if(o.material)originals.add(o.material);});
+    const rivalMaterial=options.rival?new THREE.MeshStandardMaterial({vertexColors:true,roughness:.58,metalness:.12}):null;
+    for (const wheel of wheels) batchStaticMeshes(THREE, wheel,rivalMaterial);
+    for (const eye of eyes) batchStaticMeshes(THREE, eye,rivalMaterial);
+    batchStaticMeshes(THREE, headRig,rivalMaterial); batchStaticMeshes(THREE, body,rivalMaterial);
+    const retained=new Set();group.traverse(o=>{if(o.material)retained.add(o.material);});
+    for(const material of originals)if(!retained.has(material))material.dispose();
     // Screen-space coverage fade: all surfaces use the SAME pixel mask, avoiding
     // translucent heads/chassis revealing their internal geometry near the camera.
     const fade = { value: 1 }, materials = new Set(); group.userData.cameraFadeUniform = fade;
@@ -251,7 +264,7 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
   return group;
 }
 
-function batchStaticMeshes(THREE, parent) {
+function batchStaticMeshes(THREE, parent, rivalMaterial=null) {
   const buckets = new Map();
   for (const mesh of [...parent.children]) {
     if (!mesh.isMesh) continue;
@@ -259,8 +272,14 @@ function batchStaticMeshes(THREE, parent) {
     geometry.applyMatrix4(mesh.matrix);
     // All authored parts use position, normal and uv; discard any extra channels.
     for (const name of Object.keys(geometry.attributes)) if (!['position', 'normal', 'uv'].includes(name)) geometry.deleteAttribute(name);
-    if (!buckets.has(mesh.material)) buckets.set(mesh.material, []);
-    buckets.get(mesh.material).push(geometry); mesh.geometry.dispose(); parent.remove(mesh);
+    const material=rivalMaterial&&!mesh.material.map?rivalMaterial:mesh.material;
+    if(material===rivalMaterial){
+      const colors=new Float32Array(geometry.attributes.position.count*3),color=mesh.material.color;
+      for(let i=0;i<colors.length;i+=3){colors[i]=color.r;colors[i+1]=color.g;colors[i+2]=color.b;}
+      geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+    }
+    if (!buckets.has(material)) buckets.set(material, []);
+    buckets.get(material).push(geometry); mesh.geometry.dispose(); parent.remove(mesh);
   }
   for (const [material, geometries] of buckets) {
     const merged = mergeGeometries(geometries); geometries.forEach(g => g.dispose());

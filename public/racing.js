@@ -97,7 +97,7 @@ export function compareRacers(a, b) {
   if (Boolean(a.dnf) !== Boolean(b.dnf)) return a.dnf ? 1 : -1;
   if (a.dnf && b.dnf) return b.progress-a.progress;
   if (a.finished !== b.finished) return a.finished ? -1 : 1;
-  return a.finished ? a.finishTime - b.finishTime : b.progress - a.progress;
+  return a.finished ? a.finishTime - b.finishTime : b.progress - a.progress || (a.gridPosition || 0)-(b.gridPosition || 0);
 }
 
 export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {

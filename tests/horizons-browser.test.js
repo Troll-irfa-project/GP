@@ -11,6 +11,13 @@ test('Horizons cup selection, new menu assets and three-stat garage on desktop/m
     page.on('pageerror',e=>errors.push(e.message));
     page.on('response',r=>{if(r.status()>=400)errors.push(r.url());});
     await signInPage(page,server.url);await page.goto(server.url);
+    await page.locator('#careerCup').selectOption('horizons');
+    assert.equal(await page.locator('[data-career="50"]').isEnabled(),true);
+    assert.equal(await page.locator('[data-career="100"]').isDisabled(),true);
+    await page.locator('[data-career="50"]').click();
+    await page.waitForFunction(()=>document.querySelector('#roomCircuit').textContent==='Canyon Solaire');
+    assert.equal(await page.locator('#competitionCup').inputValue(),'horizons');
+    await page.locator('#leaveRoomButton').click();
     await page.locator('[data-room="room-1"]').click();
     await page.locator('#competitionMode').selectOption('tournament');
     await page.locator('#competitionCup').selectOption('horizons');
