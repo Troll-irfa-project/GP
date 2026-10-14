@@ -71,7 +71,7 @@ achievements.push(...[
     "metric": "podiums",
     "goal": 30,
     "description": "Obtenir 30 podiums en course. Débloque l’achat de Stevie.",
-    "coins": 0,
+    "coins": 750,
     "xp": 300
   },
   {
@@ -80,7 +80,7 @@ achievements.push(...[
     "metric": "races",
     "goal": 80,
     "description": "Terminer 80 courses. Débloque l’achat de Timmy.",
-    "coins": 0,
+    "coins": 1000,
     "xp": 300
   },
   {
@@ -89,7 +89,7 @@ achievements.push(...[
     "metric": "itemHits",
     "goal": 150,
     "description": "Toucher 150 adversaires avec une échelle ou un revolver dans des courses terminées. Débloque l’achat de Le Coach.",
-    "coins": 0,
+    "coins": 1500,
     "xp": 300
   },
   {
@@ -98,7 +98,7 @@ achievements.push(...[
     "metric": "wins",
     "goal": 40,
     "description": "Gagner 40 courses. Débloque l’achat de Lieutenant Dan.",
-    "coins": 0,
+    "coins": 1500,
     "xp": 300
   },
   {
@@ -107,7 +107,7 @@ achievements.push(...[
     "metric": "winningCircuits",
     "goal": 5,
     "description": "Gagner sur chacun des cinq circuits. Débloque l’achat de Jake Sully.",
-    "coins": 0,
+    "coins": 1000,
     "xp": 300
   },
   {
@@ -116,7 +116,7 @@ achievements.push(...[
     "metric": "pureCups",
     "goal": 8,
     "description": "Gagner 8 tournois sans objets. Débloque l’achat de Philippe.",
-    "coins": 0,
+    "coins": 2000,
     "xp": 300
   },
   {
@@ -125,7 +125,7 @@ achievements.push(...[
     "metric": "enduranceWins",
     "goal": 15,
     "description": "Gagner 15 courses d’endurance. Débloque l’achat de Philippe Croizon.",
-    "coins": 0,
+    "coins": 2500,
     "xp": 300
   },
   {
@@ -134,7 +134,7 @@ achievements.push(...[
     "metric": "itemWins",
     "goal": 50,
     "description": "Gagner 50 courses avec objets. Débloque l’achat de Hector Salamanca.",
-    "coins": 0,
+    "coins": 2500,
     "xp": 300
   },
   {
@@ -143,7 +143,7 @@ achievements.push(...[
     "metric": "eliteCircuits",
     "goal": 5,
     "description": "Gagner sur les cinq circuits en 200cc. Débloque l’achat de Bran Stark.",
-    "coins": 0,
+    "coins": 3000,
     "xp": 300
   },
   {
@@ -152,7 +152,7 @@ achievements.push(...[
     "metric": "expertWins",
     "goal": 35,
     "description": "Gagner 35 courses en 150cc ou 200cc. Débloque l’achat de Christopher Reeve.",
-    "coins": 0,
+    "coins": 3000,
     "xp": 300
   },
   {
@@ -161,7 +161,7 @@ achievements.push(...[
     "metric": "eliteCups",
     "goal": 7,
     "description": "Gagner 7 tournois en 200cc. Débloque l’achat de Professeur Xavier.",
-    "coins": 0,
+    "coins": 3500,
     "xp": 300
   },
   {
@@ -170,10 +170,13 @@ achievements.push(...[
     "metric": "perfectCups",
     "goal": 2,
     "description": "Remporter les cinq manches de 2 tournois en 150cc ou 200cc. Débloque l’achat de Michael Schumacher.",
-    "coins": 0,
+    "coins": 4000,
     "xp": 300
   }
 ]);
+// Existing achievement Rush rewards are tripled; XP and race/cup payouts stay unchanged.
+for(const achievement of achievements)if(!achievement.id.startsWith('legend-'))achievement.coins*=3;
+
 export function achievementProgress(achievement,metrics) {
   return achievement.requirements ? achievement.requirements.filter(r=>(metrics[r.metric]||0)>=r.goal).length : metrics[achievement.metric]||0;
 }

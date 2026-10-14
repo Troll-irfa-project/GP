@@ -37,6 +37,20 @@ export class Economy {
       this.db.prepare('INSERT INTO economy_migrations VALUES(3)').run();
     });
   }
+  migrateAchievementRush() {
+    if(this.db.prepare('SELECT 1 FROM economy_migrations WHERE id=4').get())return;
+    this.transaction(()=>{
+      const earned=this.db.prepare('SELECT user_id,achievement_id FROM earned_achievements').all();
+      for(const row of earned){
+        const achievement=achievements.find(a=>a.id===row.achievement_id);
+        if(!achievement)continue;
+        const previous=this.db.prepare('SELECT coins FROM rewards WHERE user_id=? AND event_id=?').get(row.user_id,'achievement:'+achievement.id);
+        const difference=Math.max(0,achievement.coins-(previous?.coins||0));
+        if(difference)this.grant(row.user_id,'achievement-rush-v4:'+achievement.id,'Complément Rush : '+achievement.name,{coins:difference,xp:0});
+      }
+      this.db.prepare('INSERT INTO economy_migrations VALUES(4)').run();
+    });
+  }
   transaction(fn) {
     this.db.exec('BEGIN IMMEDIATE');
     try {const value=fn();this.db.exec('COMMIT');return value;}catch(error){this.db.exec('ROLLBACK');throw error;}

@@ -65,6 +65,7 @@ export class Accounts {
     this.economy = new Economy(this.db);
     this.economy.migrateBalance();
     this.economy.migrateLegends();
+    this.economy.migrateAchievementRush();
     this.prune();
   }
   prune() { this.db.prepare('DELETE FROM sessions WHERE expires_at <= ?').run(Date.now()); }

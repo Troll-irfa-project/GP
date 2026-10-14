@@ -25,7 +25,7 @@ Stephen Hawking reste le déblocage ultime à 25 000 Rush avec ses conditions ex
 
 ### Succès légendaires
 
-Chaque objectif ouvre l’achat du personnage et accorde 300 XP, une seule fois (aucun Rush bonus). Les prix restent inchangés. Les résultats enregistrés avant la mise à jour comptent, les achats antérieurs restent acquis.
+Chaque objectif ouvre l’achat du personnage et accorde 300 XP et de 750 à 4 000 Rush, une seule fois. Les prix restent inchangés. Les autres succès rapportent désormais trois fois leur récompense Rush initiale, sans changer l’XP ni les gains de course/tournoi. Les succès déjà obtenus reçoivent automatiquement la différence au démarrage du serveur, une seule fois. Les résultats enregistrés avant la mise à jour comptent, les achats antérieurs restent acquis.
 
 | Pilote | Objectif |
 | --- | --- |

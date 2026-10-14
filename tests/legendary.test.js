@@ -90,3 +90,30 @@ test('historical legendary migration keeps purchases and credits eligible goals 
     assert.deepEqual(db.profile('old').progression,after);
   }finally{db.close();}
 });
+test('increased achievement Rush: retroactive difference only, no XP duplication or repeat payment',()=>{
+  const db=new Accounts(':memory:');
+  try{
+    db.db.prepare('INSERT INTO users(id,username,username_key,password_hash,created_at) VALUES(?,?,?,?,0)').run('rush','Rush','rush','test-only');
+    const old=[['first-finish',40],['legend-bran',0]];
+    for(const [id,coins] of old){
+      db.db.prepare('INSERT INTO earned_achievements VALUES(?,?)').run('rush',id);
+      db.economy.grant('rush','achievement:'+id,'Old reward',{coins,xp:100});
+    }
+    const current=achievements.find(a=>a.id==='legend-stevie');
+    db.db.prepare('INSERT INTO earned_achievements VALUES(?,?)').run('rush',current.id);
+    db.economy.grant('rush','achievement:'+current.id,'New reward',current);
+    const before=db.profile('rush').progression;
+    db.db.prepare('DELETE FROM economy_migrations WHERE id=4').run();
+    db.economy.migrateAchievementRush();
+    const after=db.profile('rush').progression;
+    assert.equal(after.coins-before.coins,80+3000);
+    assert.equal(after.xp,before.xp);
+    assert.equal(after.recent.filter(r=>r.id.startsWith('achievement-rush-v4:')).length,2);
+    assert.equal(after.owned.length,0);
+    db.economy.migrateAchievementRush();
+    assert.deepEqual(db.profile('rush').progression,after);
+    assert.equal(achievements.find(a=>a.id==='first-finish').coins,120);
+    assert.equal(achievements.find(a=>a.id==='legend-schumacher').coins,4000);
+    assert.ok(achievements.every(a=>a.coins>0));
+  }finally{db.close();}
+});

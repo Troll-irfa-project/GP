@@ -76,7 +76,7 @@ test('endurance records isolated in both item modes; rewards, achievements and p
     const before=db.profile(id).progression;db.recordResult({...base,raceId:'e0',mode:'endurance',pitStops:2,perfectStops:2});
     assert.equal(db.leaderboard('coast').races[0].timeMs,60000);assert.equal(db.leaderboard('coast',false,'endurance').races[0].timeMs,300000);
     assert.equal(db.leaderboard('coast',true,'endurance').races.length,0);
-    assert.equal(db.profile(id).progression.coins-before.coins,raceReward(1,'200','endurance').coins+50);
+    assert.equal(db.profile(id).progression.coins-before.coins,raceReward(1,'200','endurance').coins+150);
     assert.equal(raceReward(1,'200','endurance').coins,raceReward(1,'200').coins*4);
     for(let i=1;i<10;i++)db.recordResult({...base,raceId:'e'+i,trackId:tracks[i%5].id,mode:'endurance',itemsEnabled:i%2===1,pitStops:2,perfectStops:2});
     const p=db.profile(id).progression;for(const a of ['endurance-debut','endurance-regular','endurance-winner','endurance-pure','endurance-chaos','pit-perfect','endurance-master'])assert.ok(p.earned.includes(a),a);
