@@ -13,6 +13,7 @@
   <link rel="stylesheet" href="/endurance.css" />
   <link rel="stylesheet" href="/progression.css" />
   <link rel="stylesheet" href="/customization.css"/>
+  <link rel="stylesheet" href="/time-trial.css"/>
 </head>
 <body>
   <main class="app-shell">
@@ -56,7 +57,7 @@
         <div class="preview-stage"><canvas id="garagePreview" aria-label="Aperçu 3D du personnage et du fauteuil sélectionnés. Glisser pour faire tourner."></canvas><button id="previousChoice" class="round-arrow previous" aria-label="Choix précédent">‹</button><button id="nextChoice" class="round-arrow next" aria-label="Choix suivant">›</button><span class="preview-hint">↔ GLISSER POUR FAIRE TOURNER</span></div>
       </div>
       <div id="circuitContent" class="circuit-content hidden">
-        <div class="selection-details"><div class="section-kicker" id="trackKicker">GRAND PRIX / 02</div><h2 id="trackName">Côte Azur</h2><p id="trackDescription" class="flavor"></p><div class="track-facts"><span><small>TOURS</small><strong>03</strong></span><span><small>CONCURRENTS</small><strong>12</strong></span><span><small>LONGUEUR</small><strong id="trackLength">—</strong></span></div><div class="difficulty"><span>TECHNICITÉ</span><div id="trackDifficulty"></div></div><p id="trackTip" class="track-tip"></p></div>
+      <div class="selection-details"><div class="section-kicker" id="trackKicker">GRAND PRIX / 02</div><h2 id="trackName">Côte Azur</h2><p id="trackDescription" class="flavor"></p><div class="track-facts"><span><small>TOURS</small><strong>03</strong></span><span><small>CONCURRENTS</small><strong>12</strong></span><span><small>LONGUEUR</small><strong id="trackLength">—</strong></span></div><div id="timeTrialMedals" class="time-trial-medals hidden" aria-live="polite"></div><div class="difficulty"><span>TECHNICITÉ</span><div id="trackDifficulty"></div></div><p id="trackTip" class="track-tip"></p></div>
         <div class="route-preview"><span>LE TRACÉ</span><svg id="trackRoute" viewBox="-65 -70 130 140" role="img" aria-label="Tracé réel du circuit sélectionné"></svg><small>3 TOURS POUR FAIRE LA DIFFÉRENCE</small></div>
       </div>
       <div class="selection-dock"><div class="dock-heading"><span id="dockLabel">CHOISIS TON PERSONNAGE</span><span id="selectionCount">01 / 07</span></div><div id="pilots" class="pilot-list"></div><div id="chairs" class="chair-list hidden"></div><div id="tracks" class="track-list hidden"></div></div>

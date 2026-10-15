@@ -180,4 +180,18 @@ export const legendaryPilots = [
     "portrait": null,
     "art": "/assets/legendary/schumacher.png"
   }
+  ,{
+    "id": "robot",
+    "name": "R-0BOT",
+    "short": "R-0BOT",
+    "price": 0,
+    "color": "#8ee7ff",
+    "skin": "#9aa5b1",
+    "hair": "#d7f7ff",
+    "style": "helmet",
+    "description": "Personnage légendaire robot, construit pour battre le chrono.",
+    "role": "Personnage légendaire robot, construit pour battre le chrono.",
+    "rarity": "legendary",
+    "portrait": null
+  }
 ];

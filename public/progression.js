@@ -1,4 +1,4 @@
-import { logoAchievements } from './logo-catalog.js';
+import { logoAchievements, bonusLogoAchievements } from './logo-catalog.js';
 import { legendaryPilots } from './legendary-catalog.js';
 // Shared display rules. Currency, ownership and rewards are enforced by the server.
 export const shopItems = [
@@ -190,7 +190,17 @@ shopItems.push(
   {id:'title-horizons',type:'title',name:'Souverain des Horizons',description:'Vainqueur Horizons 200cc.',price:5000,level:12,achievement:'horizons-200'}
 );
 
-achievements.push(...logoAchievements);
+achievements.push(...logoAchievements,...bonusLogoAchievements);
+achievements.push(
+  {id:'tt-bronze',name:'Première médaille',description:'Gagner 3 médailles de bronze en contre-la-montre.',metric:'timeTrialBronze',goal:3,coins:180,xp:400},
+  {id:'tt-silver',name:'Régulier au chrono',description:'Gagner 3 médailles d’argent en contre-la-montre.',metric:'timeTrialSilver',goal:3,coins:300,xp:650},
+  {id:'tt-gold',name:'Or au poignet',description:'Gagner 3 médailles d’or en contre-la-montre. Récompense : kart Chronos offert.',metric:'timeTrialGold',goal:3,coins:500,xp:1000},
+  {id:'tt-master',name:'Maître du temps',description:'Gagner 10 médailles d’or en contre-la-montre. Récompense : personnage légendaire robot offert.',metric:'timeTrialGold',goal:10,coins:1200,xp:2200}
+);
+shopItems.push(
+  {id:'chair-chronos',type:'chair',target:'chronos',name:'Chronos Kart',description:'Kart spécial de contre-la-montre : 10 vitesse / 9 accélération / 5 maniabilité = 24 points. Récompense gratuite.',price:0,level:1,achievement:'tt-gold',freeOnAchievement:true},
+  {id:'pilot-robot',type:'pilot',target:'robot',name:'R-0BOT',description:'Personnage légendaire robot, récompense gratuite du maître du temps.',price:0,level:1,rarity:'legendary',achievement:'tt-master',freeOnAchievement:true}
+);
 
 export function achievementProgress(achievement,metrics) {
   return achievement.requirements ? achievement.requirements.filter(r=>(metrics[r.metric]||0)>=r.goal).length : metrics[achievement.metric]||0;

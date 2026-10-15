@@ -61,6 +61,7 @@ export class Accounts {
     this.db.exec('CREATE TABLE IF NOT EXISTS records_with_items(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,track_id TEXT NOT NULL,best_race_ms INTEGER NOT NULL,best_lap_ms INTEGER,PRIMARY KEY(user_id,track_id))');
     const enduranceColumns=this.db.prepare('PRAGMA table_info(race_results)').all().map(c=>c.name);
     for(const [column,definition] of [['race_mode',"TEXT NOT NULL DEFAULT 'race'"],['pit_stops','INTEGER NOT NULL DEFAULT 0'],['perfect_stops','INTEGER NOT NULL DEFAULT 0']])if(!enduranceColumns.includes(column))this.db.exec('ALTER TABLE race_results ADD COLUMN '+column+' '+definition);
+    if(!this.db.prepare('PRAGMA table_info(race_results)').all().some(c=>c.name==='time_trial_medal'))this.db.exec("ALTER TABLE race_results ADD COLUMN time_trial_medal TEXT NOT NULL DEFAULT ''");
     this.db.exec('CREATE TABLE IF NOT EXISTS endurance_records(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,track_id TEXT NOT NULL,items_enabled INTEGER NOT NULL,best_race_ms INTEGER NOT NULL,best_lap_ms INTEGER,PRIMARY KEY(user_id,track_id,items_enabled)); CREATE INDEX IF NOT EXISTS endurance_rank ON endurance_records(track_id,items_enabled,best_race_ms);');
     if(!this.db.prepare('PRAGMA table_info(tournament_results)').all().some(c=>c.name==='cup_id'))this.db.exec("ALTER TABLE tournament_results ADD COLUMN cup_id TEXT NOT NULL DEFAULT 'classic'");
     this.economy = new Economy(this.db);
@@ -130,12 +131,13 @@ export class Accounts {
   }
   sessionValid(hash) { return Boolean(this.db.prepare('SELECT 1 FROM sessions WHERE token_hash=? AND expires_at>?').get(hash, Date.now())); }
   revoke(token) { if (token) this.db.prepare('DELETE FROM sessions WHERE token_hash=?').run(tokenHash(token)); }
-  recordResult({ raceId, userId, trackId, time, bestLap, place, difficulty = '100', itemsEnabled = false, itemStats = {}, mode = 'race', pitStops = 0, perfectStops = 0 }) {
+  recordResult({ raceId, userId, trackId, time, bestLap, place, difficulty = '100', itemsEnabled = false, itemStats = {}, mode = 'race', pitStops = 0, perfectStops = 0, timeTrialMedal = '' }) {
     const timeMs = Math.round(time * 1000), lapMs = Number.isFinite(bestLap) ? Math.round(bestLap * 1000) : null;
     if (!Number.isFinite(timeMs) || timeMs <= 0 || !Number.isInteger(place) || place<1 || place>12) return;
     this.db.exec('BEGIN IMMEDIATE');
     try {
-      const inserted = this.db.prepare('INSERT OR IGNORE INTO race_results(race_id,user_id,track_id,time_ms,place,created_at,difficulty,balance_version,items_enabled,item_boxes,item_uses,item_hits,race_mode,pit_stops,perfect_stops) VALUES(?,?,?,?,?,?,?,3,?,?,?,?,?,?,?)').run(raceId, userId, trackId, timeMs, place, Date.now(),difficulty,itemsEnabled?1:0,...['boxes','uses','hits'].map(k=>itemsEnabled?Math.max(0,Math.floor(itemStats[k]||0)):0),mode,mode==='endurance'?pitStops:0,mode==='endurance'?perfectStops:0);
+      const medal=['bronze','silver','gold'].includes(timeTrialMedal)?timeTrialMedal:'';
+      const inserted = this.db.prepare('INSERT OR IGNORE INTO race_results(race_id,user_id,track_id,time_ms,place,created_at,difficulty,balance_version,items_enabled,item_boxes,item_uses,item_hits,race_mode,pit_stops,perfect_stops,time_trial_medal) VALUES(?,?,?,?,?,?,?,3,?,?,?,?,?,?,?,?)').run(raceId, userId, trackId, timeMs, place, Date.now(),difficulty,itemsEnabled?1:0,...['boxes','uses','hits'].map(k=>itemsEnabled?Math.max(0,Math.floor(itemStats[k]||0)):0),mode,mode==='endurance'?pitStops:0,mode==='endurance'?perfectStops:0,medal);
       if (inserted.changes) {
         this.db.prepare('UPDATE users SET races_finished=races_finished+1,races_won=races_won+? WHERE id=?').run(place === 1 ? 1 : 0, userId);
         if(mode==='endurance')this.db.prepare(`INSERT INTO endurance_records VALUES(?,?,?,?,?) ON CONFLICT(user_id,track_id,items_enabled) DO UPDATE SET best_race_ms=MIN(best_race_ms,excluded.best_race_ms),best_lap_ms=CASE WHEN best_lap_ms IS NULL THEN excluded.best_lap_ms WHEN excluded.best_lap_ms IS NULL THEN best_lap_ms ELSE MIN(best_lap_ms,excluded.best_lap_ms) END`).run(userId,trackId,itemsEnabled?1:0,timeMs,lapMs);

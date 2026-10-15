@@ -23,7 +23,7 @@ export function createSelection(onChange,onCustomize) {
   let progression = null, previewPilotId = null,customizing=false;
   $('#chairTab').insertAdjacentHTML('afterend','<button id="customizeTab" class="customize-trigger" aria-pressed="false">COULEURS & LOGOS</button>');
   const customization=createCustomization({save:onCustomize,preview:style=>{if(!customizing)return;garage?.update(paintChair(chairs.find(c=>c.id===chairId),progression?.paint,style),pilots.find(p=>p.id===pilotId));garage?.setRearView(true);}});
-  let populated = false, rosterSignature = '', trackLocked = false;
+  let populated = false, rosterSignature = '', trackLocked = false, timeTrial = null;
   const choices = () => ({ chairId, pilotId, trackId });
   const listFor = () => screen === 'pilot' ? pilots : screen === 'chair' ? chairs : orderedTracks;
   const idFor = () => screen === 'pilot' ? (previewPilotId || pilotId) : screen === 'chair' ? chairId : trackId;
@@ -125,6 +125,12 @@ export function createSelection(onChange,onCustomize) {
     $('#trackLength').textContent = `${Math.round(length)} m`;
     $('#trackDifficulty').innerHTML = Array.from({ length: 5 }, (_, i) => `<i class="${i < theme.difficulty ? 'on' : ''}"></i>`).join('');
     $('#trackDifficulty').setAttribute('aria-label', `${theme.difficulty} sur 5`);
+    const medalPanel=$('#timeTrialMedals');
+    medalPanel.classList.toggle('hidden',!timeTrial);
+    if(timeTrial){
+      const medalTime=medal=>Number(timeTrial.medals?.[medal]||0);
+      medalPanel.innerHTML=`<span class="medal-title">TEMPS À BATTRE · ${String(timeTrial.target||'gold').toUpperCase()}</span><div><b class="bronze">BRONZE <strong>${medalTime('bronze').toFixed(2)} s</strong></b><b class="silver">ARGENT <strong>${medalTime('silver').toFixed(2)} s</strong></b><b class="gold">OR <strong>${medalTime('gold').toFixed(2)} s</strong></b></div>${timeTrial.target==='record'?`<small>Référence sélectionnée : ${Number(timeTrial.reference||0).toFixed(2)} s</small>`:''}`;
+    }
     const route = track.route.map(p => p.join(',')).join(' '), start = track.route[0];
     const xs = track.route.map(p => p[0]), zs = track.route.map(p => p[1]);
     $('#trackRoute').setAttribute('viewBox', `${Math.min(...xs) - 12} ${Math.min(...zs) - 12} ${Math.max(...xs) - Math.min(...xs) + 24} ${Math.max(...zs) - Math.min(...zs) + 24}`);
@@ -155,8 +161,12 @@ export function createSelection(onChange,onCustomize) {
     setReady(value) { ready = value; $('#continueButton').disabled = !value; $('#startButton').disabled = !value; },
     update(state) {
       if (!populated) render();
-      const racers = state?.racers || [], signature = JSON.stringify([state?.lobby?.laps,racers.map(r => [r.id, r.name, r.isBot])]);
-      if (signature === rosterSignature) return; rosterSignature = signature;
+      const nextTimeTrial=state?.lobby?.mode==='time-trial'?state.lobby.timeTrial:null;
+      const timeTrialChanged=JSON.stringify(nextTimeTrial)!==JSON.stringify(timeTrial);
+      timeTrial=nextTimeTrial;
+      const racers = state?.racers || [], signature = JSON.stringify([state?.lobby?.laps,state?.lobby?.mode,timeTrial?.target,timeTrial?.reference,timeTrial?.medals,racers.map(r => [r.id, r.name, r.isBot])]);
+      if (signature === rosterSignature) {if(timeTrialChanged)render();return;} rosterSignature = signature;
+      if(timeTrialChanged)render();
       $('#slots').replaceChildren(...Array.from({ length: MAX_RACERS }, (_, i) => {
         const r = racers[i], slot = document.createElement('span'); slot.className = `slot ${r && !r.isBot ? 'human' : ''}`;
         slot.textContent = r && !r.isBot ? '●' : 'AI'; slot.title = r ? `${r.name}${r.isBot ? ' · bot' : ''}` : 'Place libre — complétée par un bot'; return slot;

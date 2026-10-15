@@ -1,4 +1,4 @@
-import {logos} from './logo-catalog.js';
+import {allLogos as logos} from './logo-catalog.js';
 
 // One shared 512x256 canvas per selected logo, never recreated per frame/car.
 const textures=new Map();

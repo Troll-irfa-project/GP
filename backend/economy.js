@@ -98,6 +98,7 @@ export class Economy {
       circuits:this.db.prepare('SELECT COUNT(DISTINCT track_id) AS n FROM (SELECT track_id FROM records WHERE user_id=? UNION SELECT track_id FROM records_with_items WHERE user_id=?)').get(id,id).n,
       cups:this.db.prepare('SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND place=1 AND points>0').get(id).n,
       ...Object.fromEntries(['50','100','150','200'].map(d=>['horizons'+d,this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND cup_id='horizons' AND difficulty=? AND place=1 AND points>0").get(id,d).n])),
+      ...Object.fromEntries(['bronze','silver','gold'].map(m=>['timeTrial'+m[0].toUpperCase()+m.slice(1),this.db.prepare("SELECT COUNT(*) AS n FROM race_results WHERE user_id=? AND race_mode='time-trial' AND time_trial_medal=?").get(id,m).n])),
       career150:this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND cup_id='classic' AND difficulty='150' AND place=1 AND points>0").get(id).n,
       career:this.db.prepare("SELECT COUNT(DISTINCT difficulty) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND cup_id='classic' AND place=1 AND points>0").get(id).n};
   }
@@ -106,6 +107,9 @@ export class Economy {
     for(const a of achievements) if(achievementProgress(a,metrics)>=a.goal) {
       const inserted=this.db.prepare('INSERT OR IGNORE INTO earned_achievements VALUES(?,?)').run(id,a.id);
       if(inserted.changes)this.grant(id,'achievement:'+a.id,'Succès : '+a.name,a);
+    }
+    for(const row of this.db.prepare('SELECT achievement_id FROM earned_achievements WHERE user_id=?').all(id)){
+      for(const item of shopItems.filter(item=>item.achievement===row.achievement_id&&item.freeOnAchievement))this.db.prepare('INSERT OR IGNORE INTO inventory VALUES(?,?)').run(id,item.id);
     }
   }
   profile(id) {

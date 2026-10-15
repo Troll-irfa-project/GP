@@ -21,6 +21,10 @@ export const logoAchievements=logos.map((logo,index)=>({
   goal:index+1,coins:100+index*75,xp:50+index*25,logo:logo.id,
   requirements:logos.slice(0,index+1).map(l=>({metric:l.metric,goal:l.target,label:l.objective}))
 }));
-export const ownsLogo=(progression,id)=>id===null||logos.some(l=>l.id===id&&progression?.earned?.includes(l.achievement));
+export const ownsLogo=(progression,id)=>id===null||allLogos.some(l=>l.id===id&&progression?.earned?.includes(l.achievement));
 export const validColor=value=>typeof value==='string'&&/^#[0-9a-fA-F]{6}$/.test(value);
 export const colorSwatches=['#ff6b52','#ed2851','#ffac35','#ffd449','#74d464','#21d9bd','#70a6ff','#4262df','#9b78ff','#ff5299','#f6f3e9','#252b38'];
+export const bonusLogos=[{id:'watch',name:'Montre Chrono',metric:'timeTrialGold',target:1,objective:'Gagner 1 médaille d’or en contre-la-montre.',tier:14,achievement:'logo-watch',art:'/assets/logos/watch.svg'}];
+export const bonusLogoAchievements=bonusLogos.map(logo=>({id:logo.achievement,name:'Écusson '+logo.name,description:logo.objective+' Offre directement le logo '+logo.name+', sans achat.',goal:logo.target,coins:250,xp:150,logo:logo.id,requirements:[{metric:logo.metric,goal:logo.target,label:logo.objective}]}));
+export const allLogos=[...logos,...bonusLogos];
+export const allLogoAchievements=[...logoAchievements,...bonusLogoAchievements];
