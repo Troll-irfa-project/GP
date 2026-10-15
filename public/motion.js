@@ -14,8 +14,8 @@ export function approachSpeed(speed, target, acceleration, dt) {
   return speed + Math.max(-step, Math.min(step, target - speed));
 }
 
-export function driveSpeed(speed, input, chair, grip, boost, skill, dt, upgrade = null, itemBoost = 0, slow = 0, tyres = 1) {
-  const top = topSpeed(chair) * grip * skill * (slow > 0 ? .8 : 1) * tyres;
+export function driveSpeed(speed, input, chair, grip, boost, skill, dt, upgrade = null, itemBoost = 0, slow = 0, tyres = 1, extraTop = 0, heavySlow = 0) {
+  const top = topSpeed(chair) * grip * skill * (heavySlow > 0 ? .25 : slow > 0 ? .8 : 1) * tyres + extraTop;
   const target = input.brake ? -4 : input.gas ? Math.min(top * (boost > 0 ? 1.35 : itemBoost > 0 ? 1.2 : 1), input.speedLimit ?? Infinity) : 0;
   // Linear acceleration independent of Vmax: low-speed chassis do not accelerate worse.
   const acceleration = (2.2 + chair.accel * .65) * (upgrade === 'module-start' ? 1.02 : 1);
@@ -76,7 +76,7 @@ export class SnapshotBuffer {
     out.x = a.x + (b.x - a.x) * alpha;
     out.z = a.z + (b.z - a.z) * alpha;
     out.heading = a.heading + angleDelta(a.heading, b.heading) * alpha;
-    for (const key of ['speed', 'steer', 'boost', 'drift', 'itemBoost', 'slow', 'blur', 'stun']) out[key] = (a[key] || 0) + ((b[key] || 0) - (a[key] || 0)) * alpha;
+    for (const key of ['speed', 'steer', 'boost', 'drift', 'itemBoost', 'slow', 'blur', 'stun', 'caneBoost', 'lightning', 'lightningBoost', 'heavySlow']) out[key] = (a[key] || 0) + ((b[key] || 0) - (a[key] || 0)) * alpha;
     out.spin = a.spin > 0 ? Math.max(0,a.spin-(time-before.time)/1000) : alpha>=1 ? b.spin||0 : 0;
     out.drifting = alpha < .5 ? Boolean(a.wasDrifting) : Boolean(b.wasDrifting);
     // Reveal the result only when the interpolated vehicle has reached the line.

@@ -1,5 +1,5 @@
 import { compareRacers } from './racing.js';
-import { raceItems } from './items.js';
+import { allRaceItems as raceItems } from './items.js';
 
 const paths={
   viagra:'M12 36 30 8 26 25 44 20 24 49 28 31Z',
@@ -8,6 +8,10 @@ const paths={
   'viagra-box':'M9 17 28 7 47 17v25L28 51 9 42ZM9 17l19 10 19-10M28 27v24M20 15l18 10',
   revolver:'M7 17h39v11H29l-3 9H15l4-9H7ZM18 37l-3 12h10l2-12M46 15v16',
   round:'M16 9h24v12a12 12 0 0 1-24 0ZM28 33v14M19 47h18M16 18h24',
+  puddle:'M7 36c8-12 34-12 42 0-8 9-34 9-42 0ZM16 31c2-8 5-12 9-14M33 30c2-7 4-10 7-12',
+  cane:'M38 8c-12 0-15 8-11 14l11 8M38 8l8 5M27 21 12 49M8 49h16',
+  aah:'M28 10v36M10 28h36M17 17l22 22M39 17 17 39',
+  lightning:'M33 5 14 31h13l-3 20 19-27H30Z',
 };
 export const itemIcon=id=>`<svg viewBox="0 0 56 56" aria-hidden="true"><path d="${paths[id]||'M21 19a8 8 0 1 1 12 7l-5 4v6M28 43v2'}" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
 
@@ -17,6 +21,7 @@ export function createItemsUI(activate) {
   document.getElementById('useItem').onclick=activate;
   const instructions=document.createElement('details');instructions.className='item-guide';
   instructions.innerHTML=`<summary>LES 6 OBJETS · TOUCHE A</summary><p>Un seul emplacement. Traverse une boîte pour l’ouvrir ; elle revient après 8 s. Les bots utilisent aussi les objets. Effets fictifs de jeu.</p><div>${raceItems.map(i=>`<article style="--item-color:${i.color}">${itemIcon(i.id)}<span><b>${i.name}</b><small>${i.description}</small></span></article>`).join('')}</div>`;
+  instructions.innerHTML=instructions.innerHTML.replace('LES 6 OBJETS','LES 10 OBJETS');
   document.getElementById('roomGarageButton').before(instructions);
   let previousItem='',previousNotice='';
   return {update(state,me){

@@ -39,7 +39,7 @@ export function nearest(course, x, z, around = null) {
   }
   return best || nearest(course, x, z);
 }
-const pathDelta = (course, from, to) => wrap(to - from + course.total / 2, course.total) - course.total / 2;
+export const pathDelta = (course, from, to) => wrap(to - from + course.total / 2, course.total) - course.total / 2;
 
 export function spawnRacer(r, i, course) {
   const {along,lane} = gridSlot(i);
@@ -49,8 +49,14 @@ export function spawnRacer(r, i, course) {
     distance: along, progress: 0, lap: 1, lastAlong: wrap(along, course.total),
     finished: false, dnf: false, boost: 0, boostCooldown: 0, drift: 0, wasDrifting: false,
     finishTime: null, completedLaps: 0, lapStarted: false, lapStartTime: null, bestLapTime: null, nextCheckpoint: 0, recoveryCount: 0, recoveryFlash: 0,
+    caneBoost: 0, caneBonus: 0, lightning: 0, lightningBoost: 0, lightningHitCooldown: 0, heavySlow: 0,
     ai: { lane, stuck: 0, bestDistance: along, safeAlong: wrap(along, course.total) }
   });
+}
+
+function stopOnCollision(r, time) {
+  r.speed=0; r.stun=Math.max(r.stun||0,.5); r.collisionGhost=Math.max(r.collisionGhost||0,3); r.spin=.5; r.drift=0; r.wasDrifting=false; r.heavySlow=3;
+  r.itemNotice={text:'ACCIDENT ECLAIR · RALENTI',until:time+2.5};
 }
 
 // A swept crossing, in the correct direction, inside the actual gate. A reverse
@@ -128,7 +134,9 @@ export function botInput(r, chair, course, n, racers = [], dt = 1 / 60) {
   const distance = Math.max(1, Math.hypot(dx, dz));
   const angularSpeed = 2 * Math.max(4, r.speed) * Math.sin(error) / distance;
   let steer = Math.abs(error) > 1.1 ? Math.sign(error) : clamp(angularSpeed / steeringRate(chair, r.speed), -1, 1);
-  let speedLimit = topSpeed(chair) * (r.skill || 1) * (r.boost>0 ? 1.35 : r.itemBoost>0 ? 1.2 : 1) * (r.slow>0 ? .8 : 1) * tyreFactor(r);
+  const extraTop = (r.caneBoost > 0 ? (r.caneBonus || 0) * Math.min(1, r.caneBoost / 2.5) : 0) +
+    (r.lightningBoost > 0 ? topSpeed(chair) * .1 : 0);
+  let speedLimit = (topSpeed(chair) * (r.skill || 1) + extraTop) * (r.boost>0 ? 1.35 : r.itemBoost>0 ? 1.2 : 1) * (r.slow>0 ? .8 : 1) * (r.heavySlow>0 ? .25 : 1) * tyreFactor(r);
   // Brake BEFORE a vertex, using the available deceleration and turn radius.
   for (let i = 0; i < course.segments.length; i++) {
     const s = course.segments[i], next = course.segments[(i + 1) % course.segments.length];
@@ -181,7 +189,9 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0, aft
     const n = nearest(course, r.x, r.z, r.isBot ? r.lastAlong : null);
     const input = r.isBot ? botInput(r, chair, course, n, racers, dt) : r.input || {};
     const grip = n.distance <= course.width ? 1 : Math.min(1, .55 * (r.upgradeId === 'module-grip' ? 1.02 : 1));
-    r.speed = driveSpeed(r.speed, input, chair, grip, r.boost, r.isBot ? r.skill || 1 : 1, dt, r.upgradeId, r.itemBoost, r.slow, tyreFactor(r));
+    const extraTop = (r.caneBoost > 0 ? (r.caneBonus || 0) * Math.min(1, r.caneBoost / 2.5) : 0) +
+      (r.lightningBoost > 0 ? topSpeed(chair) * .1 : 0);
+    r.speed = driveSpeed(r.speed, input, chair, grip, r.boost, r.isBot ? r.skill || 1 : 1, dt, r.upgradeId, r.itemBoost, r.slow, tyreFactor(r), extraTop, r.heavySlow);
     const steer = input.steer ?? ((input.right ? 1 : 0) - (input.left ? 1 : 0));
     r.steer += (clamp(steer, -1, 1) - r.steer) * Math.min(1, dt * 12);
     const drifting = Boolean(input.drift && Math.abs(r.steer) > .15 && r.speed > 9 && grip === 1);
@@ -218,8 +228,16 @@ export function stepRace(racers, course, chairs, dt, laps = 3, raceTime = 0, aft
   for (let i = 0; i < racers.length; i++) for (let j = i + 1; j < racers.length; j++) {
     const a = racers[i], b = racers[j];
     if (a.finished || b.finished || a.pit || b.pit) continue;
+    if (a.collisionGhost > 0 || b.collisionGhost > 0 || a.stun > 0 || b.stun > 0 || a.heavySlow > 0 || b.heavySlow > 0) continue;
     const dx = b.x - a.x, dz = b.z - a.z, distance = Math.hypot(dx, dz);
     if (distance >= 2.1) continue;
+    const lightning = a.lightning > 0 ? a : b.lightning > 0 ? b : null;
+    if (lightning && lightning.lightningHitCooldown <= 0) {
+      const victim = lightning === a ? b : a;
+      stopOnCollision(victim, raceTime);
+      lightning.lightningHitCooldown = .65;
+      lightning.lightningBoost = 5;
+    }
     const nx = distance > .001 ? dx / distance : 1, nz = distance > .001 ? dz / distance : 0;
     const aw = 1, bw = 1; // Equal mass: no hidden fourth statistic.
     const total = aw + bw, overlap = 2.1 - distance;

@@ -214,7 +214,7 @@ export class RoomManager {
       const sorted = [...room.racers].sort(compareRacers);
       if (sorted[0].finished) room.winner = sorted[0].name;
       for (const [i,r] of sorted.entries()) if (r.finished && !r.dnf && r.userId && !room.recorded.has(r.id)) {
-        this.accounts.recordResult({raceId:room.raceId,userId:r.userId,trackId:room.trackId,time:r.finishTime,bestLap:r.bestLapTime,place:i+1,difficulty:room.difficulty,itemsEnabled:room.itemsEnabled,itemStats:r.itemStats,mode:room.mode,pitStops:r.pitStops||0,perfectStops:r.perfectStops||0});
+        this.accounts.recordResult({raceId:room.raceId,userId:r.userId,trackId:room.trackId,time:r.finishTime,bestLap:r.bestLapTime,place:i+1,difficulty:room.difficulty,itemsEnabled:room.itemsEnabled,itemStats:{...r.itemStats,aahBonus:r.aahBonus||0},mode:room.mode,pitStops:r.pitStops||0,perfectStops:r.perfectStops||0});
         room.recorded.add(r.id);
         const client = room.members.get(r.userId);
         if (client) {

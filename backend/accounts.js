@@ -144,7 +144,7 @@ export class Accounts {
           best_lap_ms=CASE WHEN best_lap_ms IS NULL THEN excluded.best_lap_ms WHEN excluded.best_lap_ms IS NULL THEN best_lap_ms ELSE MIN(best_lap_ms,excluded.best_lap_ms) END`).run(userId, trackId, timeMs, lapMs);
       }
       if (inserted.changes) {
-        this.economy.grant(userId,'race:'+raceId,'Course terminée · #'+place,raceReward(place,difficulty,mode));
+        this.economy.grant(userId,'race:'+raceId,'Course terminée · #'+place,raceReward(place,difficulty,mode,itemStats.aahBonus||0));
         this.economy.checkAchievements(userId);
       }
       this.db.exec('COMMIT');
