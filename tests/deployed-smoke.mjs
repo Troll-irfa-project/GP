@@ -18,7 +18,7 @@ try {
   assert.equal(await page.locator('#shopGrid .shop-card').count(),37);
   assert.equal(await page.locator('[data-item="paint-lagoon"]').isDisabled(),true);
   await page.locator('#achievementsTab').click();
-  assert.equal(await page.locator('.achievement-card').count(),43);
+  assert.equal(await page.locator('.achievement-card').count(),56);
   await page.locator('#closeCollection').click();
   await page.locator('[data-career="50"]:enabled').waitFor();
   assert.equal(await page.locator('[data-career="100"]').isDisabled(),true);

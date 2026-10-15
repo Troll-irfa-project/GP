@@ -1,3 +1,4 @@
+import { attachChairLogo } from './chair-logo.js';
 import { dressLegendary } from './legendary-models.js';
 import { RoundedBoxGeometry } from './vendor/RoundedBoxGeometry.js';
 import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
@@ -23,6 +24,8 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
   group.name = chair.id;
   group.userData.chairId = chair.id;
   group.userData.pilotId = pilot.id;
+  group.userData.logoId = chair.logoId || null;
+  group.userData.customColor = chair.color;
   const paint = new THREE.MeshPhysicalMaterial({ color: chair.color, metalness: .2, roughness: .32, clearcoat: .75, clearcoatRoughness: .24 });
   const dark = new THREE.MeshStandardMaterial({ color: '#202935', roughness: .8 });
   const metal = new THREE.MeshStandardMaterial({ color: '#adbbc4', metalness: .65, roughness: .35 });
@@ -241,6 +244,7 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
   }
   body.add(headRig); group.add(body);
   group.userData.animation = { body, head: headRig, eyes, wheels, casters, speed: 0, steer: 0, pitch: 0, lean: 0, wheelTravel: 0 };
+  attachChairLogo(THREE,body,spec,chair.logoId);
   if (options.race) {
     const originals=new Set();group.traverse(o=>{if(o.material)originals.add(o.material);});
     const rivalMaterial=options.rival?new THREE.MeshStandardMaterial({vertexColors:true,roughness:.58,metalness:.12}):null;

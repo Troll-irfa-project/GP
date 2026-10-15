@@ -1,0 +1,19 @@
+{
+  "retrieved": "2026-10-14",
+  "note": "Downloaded SVG artwork is retained unchanged. The Looser badge is original game artwork. Logos are decorative references, not endorsements. Third-party marks remain associated with their respective owners; availability of a download does not grant a licence for every use. Review permissions before public/commercial distribution.",
+  "logos": [
+    {"id":"looser","file":"looser.svg","source":"Original Roll Rush artwork","variant":"LOOSER / NEVER GIVE UP badge"},
+    {"id":"cocacola","file":"cocacola.svg","source":"https://worldvectorlogo.com/logo/coca-cola-logo","download":"https://cdn.worldvectorlogo.com/logos/coca-cola-logo.svg"},
+    {"id":"shell","file":"shell.svg","source":"https://worldvectorlogo.com/logo/shell-4","download":"https://cdn.worldvectorlogo.com/logos/shell-4.svg"},
+    {"id":"renault","file":"renault.svg","source":"https://worldvectorlogo.com/logo/renault-7","download":"https://cdn.worldvectorlogo.com/logos/renault-7.svg","variant":"2021 diamond"},
+    {"id":"gulf","file":"gulf.svg","source":"https://worldvectorlogo.com/logo/gulf-logo","download":"https://cdn.worldvectorlogo.com/logos/gulf-logo.svg"},
+    {"id":"handicap","file":"handicap.svg","source":"https://commons.wikimedia.org/wiki/File:International_Symbol_of_Access.svg","download":"https://upload.wikimedia.org/wikipedia/commons/7/77/International_Symbol_of_Access.svg","credit":"Rehabilitation International; SVG Jacklau96 / Lezek","variant":"International Symbol of Access"},
+    {"id":"worldcup","file":"worldcup.svg","source":"https://worldvectorlogo.com/logo/fifa-world-cup-2026-3","download":"https://cdn.worldvectorlogo.com/logos/fifa-world-cup-2026-3.svg","variant":"FIFA World Cup 2026"},
+    {"id":"mercedes","file":"mercedes.svg","source":"https://worldvectorlogo.com/logo/mercedes-benz-9","download":"https://cdn.worldvectorlogo.com/logos/mercedes-benz-9.svg"},
+    {"id":"redbull","file":"redbull.svg","source":"https://worldvectorlogo.com/logo/redbullenergydrink","download":"https://cdn.worldvectorlogo.com/logos/redbullenergydrink.svg"},
+    {"id":"avengers","file":"avengers.svg","source":"https://worldvectorlogo.com/logo/avengers-1","download":"https://cdn.worldvectorlogo.com/logos/avengers-1.svg"},
+    {"id":"ferrari","file":"ferrari.svg","source":"https://worldvectorlogo.com/logo/ferrari-4","download":"https://cdn.worldvectorlogo.com/logos/ferrari-4.svg"},
+    {"id":"leagueoflegends","file":"leagueoflegends.svg","source":"https://www.leagueoflegends.com/en-us/league-of-legends-downloads/","download":"https://cmsassets.rgpub.io/sanity/files/dsfx7636/news/039a7a75db4ec01820c6289b30258ee03320de22.zip","archiveEntry":"LoL_Logo_Gold/LoL_Logo_Flat_GOLD.svg","credit":"Riot Games","variant":"Official gold wordmark"},
+    {"id":"ricard","file":"ricard.svg","source":"https://fr.wikipedia.org/wiki/Fichier:Logo_Ricard.svg","download":"https://upload.wikimedia.org/wikipedia/fr/1/11/Logo_Ricard.svg","credit":"Ricard"}
+  ]
+}

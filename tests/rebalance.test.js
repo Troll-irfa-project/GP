@@ -12,7 +12,7 @@ function client(db,manager,id){const messages=[],c={user:db.profile(id),ws:{read
 test('reduced rewards, raised prices, exact F1 stats and distinct F1 geometry',()=>{
   assert.equal(raceReward(1,'50').coins,54);assert.equal(raceReward(12,'50').coins,10);
   assert.equal(cupReward(1,'50').coins,168);
-  assert.equal(shopItems.length,37);assert.equal(achievements.length,43);
+  assert.equal(shopItems.length,37);assert.equal(achievements.length,56);
   const hawking=shopItems.find(i=>i.id==='pilot-hawking');
   assert.ok(shopItems.filter(i=>i!==hawking).every(i=>i.price<hawking.price&&i.level<hawking.level));
   const f1=chairs.find(c=>c.id==='apex');assert.deepEqual(['speed','accel','handling'].map(k=>f1[k]),[10,10,4]);

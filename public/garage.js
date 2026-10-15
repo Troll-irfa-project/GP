@@ -61,11 +61,12 @@ export function createGarage(canvas) {
   for (const event of ['pointerup', 'pointercancel', 'lostpointercapture']) canvas.addEventListener(event, () => { dragX = null; });
   return {
     update(chair, pilot) {
-      const next = `${chair.id}/${chair.color}/${pilot.id}`;
+      const next = `${chair.id}/${chair.color}/${chair.logoId||''}/${pilot.id}`;
       if (signature === next) return;
       signature = next; if (model) disposeModel(model);
       model = makeChair(THREE, chair, pilot); model.position.y = .2; scene.add(model); yaw = 0;
     },
+    setRearView(value){yaw=value?Math.PI:0;},
     setActive(value) {
       active = value;
       if (active) { resize(); wake(); }

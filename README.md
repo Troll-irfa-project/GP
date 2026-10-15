@@ -81,6 +81,34 @@ Dans un salon, choisir **Tournoi → Coupe Horizons**. L’hôte choisit la coup
 
 Les nouveaux circuits sont aussi accessibles en course unique et en endurance, avec ou sans objets, et possèdent leurs classements mondiaux. Sprint Horizons : limite 10 minutes, puis 120 secondes après le premier arrivé (dans cette limite). Les autres limites restent inchangées. Comptes, achats, monnaies, succès, carrière et records existants sont conservés.
 
+## Couleurs et logos
+
+Dans le garage, ouvrir **Couleurs & Logos** : palette de 12 teintes, sélecteur de couleur libre et écusson sur le dossier de chacun des 11 fauteuils. L’aperçu se tourne vers l’arrière ; glisser permet toujours de tourner le modèle. **Appliquer au fauteuil** mémorise le choix pour ce châssis uniquement, synchronisé avec les autres joueurs. **Réinitialiser** revient à la livrée équipée (ou à la couleur d’origine) ; **Aucun** retire le logo. Les achats de livrées existants sont conservés. Une couleur personnalisée prend priorité sur la livrée tant qu’elle n’est pas réinitialisée.
+
+Les couleurs sont gratuites. Les logos sont **offerts directement par leurs succès**, jamais vendus ; les prévisualisations verrouillées ne peuvent pas être enregistrées. Les anciens résultats enregistrés sont repris automatiquement une seule fois. Chaque palier exige également tous les paliers précédents, pour maintenir l’ordre de difficulté demandé :
+
+| Palier | Logo | Objectif supplémentaire |
+|---|---|---|
+| 1 | Looser | Terminer 1 course |
+| 2 | Coca-Cola | Terminer 5 courses |
+| 3 | Shell | Obtenir 5 podiums |
+| 4 | Renault | Gagner 5 courses |
+| 5 | Gulf | Gagner 15 courses |
+| 6 | Handicap | Gagner sur 5 circuits différents |
+| 7 | Coupe du monde | Gagner 3 tournois |
+| 8 | Mercedes | Gagner 15 courses en 150/200cc |
+| 9 | Red Bull | Gagner 20 courses en 200cc |
+| 10 | Avengers | Remporter les 4 catégories de carrière Originale |
+| 11 | Ferrari | Réussir 3 grands chelems en tournoi 150/200cc |
+| 12 | League of Legends | Remporter la carrière Horizons 200cc |
+| 13 | Ricard | Gagner 15 tournois en 200cc |
+
+Chaque succès verse aussi 100 à 1 000 Rush et 50 à 350 XP, une fois. Courses avec ou sans objets acceptées. Aucun bonus de performances. Les modifications sont autorisées avant le départ, refusées pendant la course côté serveur. API authentifiée : POST `/api/customization` avec `{chairId,color,logoId}` ; couleur `#RRGGBB` ou `null`, logo du catalogue ou `null`.
+
+Les SVG sont embarqués localement ; aucune requête vers une marque pendant une course. Une texture 512×256 partagée par logo limite leur coût graphique. **Looser** est un badge original ; **Handicap** utilise le symbole international d’accessibilité ; **Coupe du monde** utilise l’emblème FIFA 2026. Le SVG League of Legends provient du kit officiel Riot. Sources et crédits : [SOURCES.json](public/assets/logos/SOURCES.json). Les marques restent celles de leurs propriétaires ; ces téléchargements ne constituent pas une autorisation générale de distribution commerciale ou d’affiliation. Vérifier les permissions avant une diffusion publique/commerciale.
+
+Réimport des fichiers absents : `node scripts/fetch-logo-assets.mjs` (jamais exécuté au démarrage Docker). Tests dédiés : `node --test tests/customization.test.js tests/customization-browser.test.js`.
+
 ## Performances navigateur
 
 Modèles de course allégés (garage détaillé inchangé), surfaces des adversaires regroupées par rig d’animation, texture d’ombre de contact partagée, ombres 1024² actualisées à 30 Hz et précompilation des shaders des douze pilotes. La résolution interne s’ajuste progressivement à la charge (ratio 0,75 à 1,35, plafonné à la densité de l’écran). La simulation serveur reste à 60 Hz. Le classement est réécrit seulement s’il change ; les points de mini-carte sont réutilisés.

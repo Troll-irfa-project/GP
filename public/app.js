@@ -15,7 +15,7 @@ import { createRaceWorld, animateWorld } from './race-world.js';
 import { createRaceEffects, attachContactShadow } from './race-effects.js';
 import { RoomEnvironment } from './vendor/RoomEnvironment.js';
 import { paintChair } from './progression.js';
-import { createPortal } from './portal.js';
+import { createPortal, api } from './portal.js';
 
 const $ = selector => document.querySelector(selector);
 const lobby = $('#lobby'), race = $('#race'), result = $('#result'), canvas = $('#game');
@@ -27,7 +27,7 @@ const selection = createSelection(choices => {
     if (state.lobby.hostId === playerId && ['race','endurance'].includes(state.lobby.mode)) data.trackId = choices.trackId;
     send('configure',data);
   }
-});
+},async data=>{const response=await api('/api/customization',data);portal.setUser(response.user);});
 function updateFavorite() {
   const favorite = portal?.user?.favoriteChairIds.includes(selection.choices().chairId) || false;
   $('#favoriteChair').setAttribute('aria-pressed',String(favorite));
@@ -134,11 +134,12 @@ function disposeObject(object) {
 function syncRacers(now, dt) {
   for (const r of state.racers) {
     let object = world.get(r.id);
-    if (object && (object.userData.paintId !== (r.paintId || null) || object.userData.chairId !== r.chairId || object.userData.pilotId !== (r.pilotId || pilots[0].id))) { disposeObject(object); world.delete(r.id); object = null; }
+    if (object && (object.userData.paintId !== (r.paintId || null) || object.userData.appearanceKey !== `${r.customColor||''}/${r.logoId||''}` || object.userData.chairId !== r.chairId || object.userData.pilotId !== (r.pilotId || pilots[0].id))) { disposeObject(object); world.delete(r.id); object = null; }
     if (!object) {
-      if (r.id === playerId && preparedChair?.userData.chairId === r.chairId && preparedChair.userData.pilotId === r.pilotId) { object = preparedChair; preparedChair = null; }
-      else object = makeChair(THREE, paintChair(state.chairs.find(c => c.id === r.chairId) || state.chairs[0],r.paintId), pilots.find(p => p.id === r.pilotId) || pilots[0], { race: true, rival: r.id !== playerId });
+      if (r.id === playerId && preparedChair?.userData.chairId === r.chairId && preparedChair.userData.pilotId === r.pilotId && preparedChair.userData.appearanceKey === `${r.customColor||''}/${r.logoId||''}`) { object = preparedChair; preparedChair = null; }
+      else object = makeChair(THREE, paintChair(state.chairs.find(c => c.id === r.chairId) || state.chairs[0],r.paintId,{color:r.customColor,logoId:r.logoId}), pilots.find(p => p.id === r.pilotId) || pilots[0], { race: true, rival: r.id !== playerId });
       object.userData.paintId = r.paintId || null;
+      object.userData.appearanceKey = `${r.customColor||''}/${r.logoId||''}`;
       object.userData.pose = {};
       object.userData.isPlayer = r.id === playerId;
       object.traverse(child => { if (child.isMesh) child.castShadow = r.id === playerId; });
@@ -302,8 +303,10 @@ async function launchRace() {
     if (roomId !== currentRoom || socket?.readyState !== 1) return;
     buildWorld(); buildTrack(state.lobby.track);
     if (preparedChair) disposeObject(preparedChair);
-    preparedChair = makeChair(THREE,paintChair(state.chairs.find(c=>c.id===choices.chairId),portal.user?.progression?.paint),pilots.find(p=>p.id===choices.pilotId),{race:true});
+    const style=portal.user?.progression?.chairStyles?.[choices.chairId];
+    preparedChair = makeChair(THREE,paintChair(state.chairs.find(c=>c.id===choices.chairId),portal.user?.progression?.paint,portal.user?.progression?.chairStyles?.[choices.chairId]),pilots.find(p=>p.id===choices.pilotId),{race:true});
     preparedChair.traverse(o=>{if(o.isMesh)o.castShadow=true;});
+    preparedChair.userData.appearanceKey=`${style?.color||''}/${style?.logoId||''}`;
     scene.add(preparedChair); await renderer.compileAsync(scene,camera); preparedChair?.removeFromParent();
     if (roomId === currentRoom && state.lobby.hostId === playerId && socket?.readyState === 1) send('start');
   } catch (error) {

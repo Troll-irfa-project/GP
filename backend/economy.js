@@ -1,3 +1,5 @@
+import { chairs } from '../public/catalog.js';
+import { ownsLogo, validColor } from '../public/logo-catalog.js';
 import { shopItems, achievements, levelProgress, raceReward, cupReward, achievementProgress } from '../public/progression.js';
 
 export class Economy {
@@ -7,6 +9,7 @@ export class Economy {
       CREATE TABLE IF NOT EXISTS inventory(user_id TEXT REFERENCES users(id),item_id TEXT NOT NULL,PRIMARY KEY(user_id,item_id));
       CREATE TABLE IF NOT EXISTS rewards(user_id TEXT REFERENCES users(id),event_id TEXT NOT NULL,label TEXT NOT NULL,coins INTEGER NOT NULL,xp INTEGER NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(user_id,event_id));
       CREATE TABLE IF NOT EXISTS earned_achievements(user_id TEXT REFERENCES users(id),achievement_id TEXT NOT NULL,PRIMARY KEY(user_id,achievement_id));
+      CREATE TABLE IF NOT EXISTS chair_styles(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,chair_id TEXT NOT NULL,color TEXT,logo_id TEXT,PRIMARY KEY(user_id,chair_id));
       CREATE TABLE IF NOT EXISTS economy_migrations(id INTEGER PRIMARY KEY);`);
     // Credit existing verified results once, without removing any existing content.
     if(!db.prepare('SELECT 1 FROM economy_migrations WHERE id=1').get()) {
@@ -51,6 +54,23 @@ export class Economy {
       this.db.prepare('INSERT INTO economy_migrations VALUES(4)').run();
     });
   }
+  migrateLogos() {
+    if(this.db.prepare('SELECT 1 FROM economy_migrations WHERE id=5').get())return;
+    this.transaction(()=>{
+      for(const {id} of this.db.prepare('SELECT id FROM users').all())this.checkAchievements(id);
+      this.db.prepare('INSERT INTO economy_migrations VALUES(5)').run();
+    });
+  }
+  customize(id,data) {
+    if(!data||Object.keys(data).some(k=>!['chairId','color','logoId'].includes(k))||!chairs.some(c=>c.id===data.chairId))throw new Error('Fauteuil ou personnalisation invalide.');
+    if(data.color!==null&&!validColor(data.color))throw new Error('Couleur invalide : utilise un code #RRGGBB.');
+    return this.transaction(()=>{
+      const p=this.profile(id),item=shopItems.find(i=>i.type==='chair'&&i.target===data.chairId);
+      if(item&&!p.owned.includes(item.id))throw new Error('Ce fauteuil n’est pas encore dans ta collection.');
+      if(!ownsLogo(p,data.logoId))throw new Error('Remporte le succès de ce logo avant de l’équiper.');
+      this.db.prepare('INSERT INTO chair_styles(user_id,chair_id,color,logo_id) VALUES(?,?,?,?) ON CONFLICT(user_id,chair_id) DO UPDATE SET color=excluded.color,logo_id=excluded.logo_id').run(id,data.chairId,data.color?.toLowerCase()||null,data.logoId);
+    });
+  }
   transaction(fn) {
     this.db.exec('BEGIN IMMEDIATE');
     try {const value=fn();this.db.exec('COMMIT');return value;}catch(error){this.db.exec('ROLLBACK');throw error;}
@@ -91,7 +111,7 @@ export class Economy {
   profile(id) {
     this.ensure(id);
     const wallet=this.db.prepare('SELECT coins,xp,paint,upgrade,title FROM wallets WHERE user_id=?').get(id);
-    return {...wallet,...levelProgress(wallet.xp),owned:this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(r=>r.item_id),
+    return {...wallet,chairStyles:Object.fromEntries(this.db.prepare('SELECT chair_id,color,logo_id FROM chair_styles WHERE user_id=?').all(id).map(s=>[s.chair_id,{color:s.color,logoId:s.logo_id}])),...levelProgress(wallet.xp),owned:this.db.prepare('SELECT item_id FROM inventory WHERE user_id=?').all(id).map(r=>r.item_id),
       earned:this.db.prepare('SELECT achievement_id FROM earned_achievements WHERE user_id=?').all(id).map(r=>r.achievement_id),metrics:this.metrics(id),
       recent:this.db.prepare('SELECT event_id AS id,label,coins,xp FROM rewards WHERE user_id=? ORDER BY created_at DESC,rowid DESC LIMIT 12').all(id)};
   }

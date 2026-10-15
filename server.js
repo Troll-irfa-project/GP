@@ -85,6 +85,14 @@ async function api(req,res,path) {
     for(const client of connections.values()) if(client.user.id===user.id) rooms.send(client,'profile',{user});
     return json(res,200,{user});
   }
+  if(path==='/api/customization') {
+    const clients=[...connections.values()].filter(c=>c.user.id===session.user.id);
+    if(clients.some(c=>c.roomId&&rooms.rooms.get(c.roomId)?.phase!=='waiting'))throw new HttpError(409,'La personnalisation est verrouillée pendant une course.');
+    try{accounts.economy.customize(session.user.id,data);}catch(error){throw new HttpError(400,error.message);}
+    const user=accounts.profile(session.user.id);
+    for(const client of clients){rooms.refreshAppearance(client);rooms.send(client,'profile',{user});const room=rooms.rooms.get(client.roomId);if(room)rooms.broadcast(room);}
+    return json(res,200,{user});
+  }
   if(path==='/api/profile') {
     const keys=Object.keys(data);
     if(keys.some(k=>!['favoriteChairIds'].includes(k)) || !Array.isArray(data.favoriteChairIds) || data.favoriteChairIds.length>chairs.length || data.favoriteChairIds.some(id=>!chairs.some(c=>c.id===id))) throw new HttpError(400,'Préférences invalides.');

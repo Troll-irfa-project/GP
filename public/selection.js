@@ -1,3 +1,4 @@
+import { createCustomization } from './customization-ui.js';
 import { chairs, pilots, tracks } from './catalog.js';
 import { silhouettes } from './chairs.js';
 import { createGarage } from './garage.js';
@@ -17,9 +18,11 @@ for(const track of tracks.filter(t=>t.cupId==='horizons'))themes[track.id]={labe
 const orderedTracks = ['coast', 'neon', 'garden', 'metro', 'orbit', 'canyon','glacier','volcano','jungle','harbor'].map(id => tracks.find(t => t.id === id));
 const pad = n => String(n).padStart(2, '0');
 
-export function createSelection(onChange) {
+export function createSelection(onChange,onCustomize) {
   let screen = 'pilot', chairId = 'comet', pilotId = 'maya', trackId = 'coast', garage, ready = false, visible = true;
-  let progression = null, previewPilotId = null;
+  let progression = null, previewPilotId = null,customizing=false;
+  $('#chairTab').insertAdjacentHTML('afterend','<button id="customizeTab" class="customize-trigger" aria-pressed="false">COULEURS & LOGOS</button>');
+  const customization=createCustomization({save:onCustomize,preview:style=>{if(!customizing)return;garage?.update(paintChair(chairs.find(c=>c.id===chairId),progression?.paint,style),pilots.find(p=>p.id===pilotId));garage?.setRearView(true);}});
   let populated = false, rosterSignature = '', trackLocked = false;
   const choices = () => ({ chairId, pilotId, trackId });
   const listFor = () => screen === 'pilot' ? pilots : screen === 'chair' ? chairs : orderedTracks;
@@ -63,7 +66,7 @@ export function createSelection(onChange) {
     onChange(choices()); render();
   }
   function show(next, focus = false) {
-    screen = next; if(next!=='pilot')previewPilotId=null; render();
+    customizing=false;screen = next; if(next!=='pilot')previewPilotId=null; render();
     if (focus) document.querySelector(`#${next === 'pilot' ? 'pilots' : next === 'chair' ? 'chairs' : 'tracks'} .active`)?.focus({ preventScroll: true });
   }
   function render() {
@@ -71,6 +74,8 @@ export function createSelection(onChange) {
     const isTrack = screen === 'track', isChair = screen === 'chair';
     const pilot = pilots.find(p => p.id === (screen==='pilot' ? previewPilotId || pilotId : pilotId)), chair = chairs.find(c => c.id === chairId), track = tracks.find(t => t.id === trackId), theme = themes[trackId];
     $('#lobby').dataset.screen = screen;
+    $('#lobby').dataset.customizing=String(customizing);
+    $('#customizeTab').classList.toggle('active',customizing);$('#customizeTab').setAttribute('aria-pressed',String(customizing));
     $('#garageContent').classList.toggle('hidden', isTrack); $('#circuitContent').classList.toggle('hidden', !isTrack);
     $('#pilots').classList.toggle('hidden', screen !== 'pilot'); $('#chairs').classList.toggle('hidden', !isChair); $('#tracks').classList.toggle('hidden', !isTrack);
     $('#continueButton').classList.toggle('hidden', isTrack); $('#startButton').classList.toggle('hidden', !isTrack);
@@ -94,7 +99,7 @@ export function createSelection(onChange) {
       $('#selectionQuote').textContent=(a ? `${earned?'✓':'🔒'} ${a.name} · ${Math.min(a.goal,achievementProgress(a,progression?.metrics||{}))}/${a.goal}. ${a.description.split(' Débloque')[0]}` : `Niveau ${item.level} requis.`) + ` Prix : ${item.price.toLocaleString('fr-FR')} Rush.`;
       $('#selectionNote').textContent=`APERÇU UNIQUEMENT · Non acheté. Pilote équipé : ${pilots.find(p=>p.id===pilotId).name}. L’achat se fait en boutique.`;
     }
-    for (const [id, active] of [['pilotTab', !isChair], ['chairTab', isChair]]) { $(`#${id}`).classList.toggle('active', active); $(`#${id}`).setAttribute('aria-pressed', active); }
+    for (const [id, active] of [['pilotTab', !isChair&&!customizing], ['chairTab', isChair&&!customizing]]) { $(`#${id}`).classList.toggle('active', active); $(`#${id}`).setAttribute('aria-pressed', active); }
     for (const [id, active] of [['garageStep', !isTrack], ['circuitStep', isTrack]]) { $(`#${id}`).classList.toggle('current', active); if (active) $(`#${id}`).setAttribute('aria-current', 'step'); else $(`#${id}`).removeAttribute('aria-current'); }
     for (const [kind, selected] of [['pilot', previewPilotId || pilotId], ['chair', chairId], ['track', trackId]]) for (const card of document.querySelectorAll(`[data-${kind}]`)) {
       const active = card.dataset[kind] === selected; card.classList.toggle('active', active); card.setAttribute('aria-pressed', active);
@@ -124,9 +129,11 @@ export function createSelection(onChange) {
     const xs = track.route.map(p => p[0]), zs = track.route.map(p => p[1]);
     $('#trackRoute').setAttribute('viewBox', `${Math.min(...xs) - 12} ${Math.min(...zs) - 12} ${Math.max(...xs) - Math.min(...xs) + 24} ${Math.max(...zs) - Math.min(...zs) + 24}`);
     $('#trackRoute').innerHTML = `<polyline points="${route} ${start.join(',')}" fill="none" stroke="#05172f" stroke-width="11" stroke-linejoin="round"/><polyline points="${route} ${start.join(',')}" fill="none" stroke="#f9dc50" stroke-width="5" stroke-linejoin="round"/><circle cx="${start[0]}" cy="${start[1]}" r="5" fill="white" stroke="#0c2544" stroke-width="2"/>`;
-    garage?.update(paintChair(chair,progression?.paint), pilot); garage?.setActive(visible && !isTrack);
+    garage?.update(paintChair(chair,progression?.paint,progression?.chairStyles?.[chair.id]), pilot); garage?.setRearView(customizing);garage?.setActive(visible && !isTrack);
+    customization.update(chair,progression,customizing);
     $('#continueButton').disabled = !ready; $('#startButton').disabled = !ready;
   }
+  $('#customizeTab').onclick=()=>{screen='chair';customizing=true;previewPilotId=null;render();};
   $('#pilotTab').onclick = () => show('pilot'); $('#chairTab').onclick = () => show('chair');
   $('#garageStep').onclick = () => show('pilot'); $('#circuitStep').onclick = () => show('track');
   $('#continueButton').onclick = () => show(screen === 'pilot' ? 'chair' : 'track', true);

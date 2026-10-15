@@ -69,9 +69,15 @@ export class RoomManager {
     if (!ownsSelection(profile.progression,'chair',data.chairId || profile.chairId) || !ownsSelection(profile.progression,'pilot',data.pilotId || profile.pilotId)) return this.error(client,'Ce pilote ou fauteuil doit être acheté dans la boutique.');
     client.racer = {id:`p-${client.user.id}`,userId:client.user.id,name:profile.username,
       chairId:validChair(data.chairId)?data.chairId:profile.chairId,pilotId:validPilot(data.pilotId)?data.pilotId:profile.pilotId,isBot:false,input:{},paintId:profile.progression?.paint || null,upgradeId:profile.progression?.upgrade || null,title:shopItems.find(i=>i.id===profile.progression?.title)?.name || '',level:profile.progression?.level || 1};
+    this.refreshAppearance(client);
     client.roomId = room.id; room.members.set(client.user.id,client);
     this.accounts.preferences(client.user.id,{chairId:client.racer.chairId,pilotId:client.racer.pilotId});
     this.reset(room); this.send(client,'joined',{playerId:client.racer.id,roomId:room.id}); this.broadcast(room); this.announce();
+  }
+  refreshAppearance(client) {
+    if(!client.racer)return;
+    const p=this.accounts.profile(client.user.id).progression || {},style=p.chairStyles?.[client.racer.chairId];
+    client.racer.paintId=p.paint||null;client.racer.customColor=style?.color||null;client.racer.logoId=style?.logoId||null;
   }
   leave(client) {
     const room = this.rooms.get(client.roomId); client.roomId = null;
@@ -102,6 +108,7 @@ export class RoomManager {
     if (data.difficulty) room.difficulty = data.difficulty;
     if (data.chairId) client.racer.chairId = data.chairId;
     if (data.pilotId) client.racer.pilotId = data.pilotId;
+    this.refreshAppearance(client);
     const changed = data.trackId && data.trackId !== room.trackId;
     if (changed) room.trackId = data.trackId;
     this.accounts.preferences(client.user.id,{chairId:client.racer.chairId,pilotId:client.racer.pilotId});

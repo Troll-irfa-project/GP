@@ -17,8 +17,8 @@ test('XP boundaries, verified rewards and achievements are credited exactly once
     const id=seed(db);assert.equal(db.profile(id).progression.coins,0);
     assert.equal(levelProgress(0).level,1);assert.equal(levelProgress(249).level,1);assert.equal(levelProgress(250).level,2);assert.equal(levelProgress(750).level,3);
     rewardRace(db,id,0);const p=db.profile(id).progression,r=raceReward(1);
-    assert.equal(p.coins,r.coins);assert.equal(p.xp,r.xp);
-    assert.deepEqual(p.earned,[]);
+    assert.equal(p.coins,r.coins+100);assert.equal(p.xp,r.xp+50);
+    assert.deepEqual(p.earned,['logo-looser']);
     rewardRace(db,id,0);assert.deepEqual(db.profile(id).progression,p);
     db.recordResult({raceId:'invalid',userId:id,trackId:'coast',time:0,place:1});assert.deepEqual(db.profile(id).progression,p);
     for(let n=1;n<30;n++)rewardRace(db,id,n,12);
@@ -64,7 +64,7 @@ test('historical migration credits actual records once, including achievement bo
     db.db.prepare('UPDATE users SET races_finished=1,races_won=1 WHERE id=?').run(id);
     db.db.prepare('INSERT INTO records VALUES(?,?,?,?)').run(id,'coast',85000,27000);
     new Economy(db.db);const first=db.profile(id).progression;
-    assert.equal(first.coins,raceReward(1).coins);assert.equal(db.profile(id).records[0].bestRaceMs,85000);
+    assert.equal(first.coins,raceReward(1).coins+100);assert.equal(db.profile(id).records[0].bestRaceMs,85000);
     new Economy(db.db);assert.deepEqual(db.profile(id).progression,first);
   }finally{db.close();}
 });
