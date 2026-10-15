@@ -161,7 +161,7 @@ export function createSelection(onChange,onCustomize) {
     setReady(value) { ready = value; $('#continueButton').disabled = !value; $('#startButton').disabled = !value; },
     update(state) {
       if (!populated) render();
-      const nextTimeTrial=state?.lobby?.mode==='time-trial'?state.lobby.timeTrial:null;
+      const nextTimeTrial=['time-trial','weekly-gp'].includes(state?.lobby?.mode)?state.lobby.timeTrial:null;
       const timeTrialChanged=JSON.stringify(nextTimeTrial)!==JSON.stringify(timeTrial);
       timeTrial=nextTimeTrial;
       const racers = state?.racers || [], signature = JSON.stringify([state?.lobby?.laps,state?.lobby?.mode,timeTrial?.target,timeTrial?.reference,timeTrial?.medals,racers.map(r => [r.id, r.name, r.isBot])]);

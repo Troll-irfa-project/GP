@@ -197,9 +197,11 @@ achievements.push(
   {id:'tt-gold',name:'Or au poignet',description:'Gagner 3 médailles d’or en contre-la-montre. Récompense : kart Chronos offert.',metric:'timeTrialGold',goal:3,coins:500,xp:1000},
   {id:'tt-master',name:'Maître du temps',description:'Gagner 10 médailles d’or en contre-la-montre. Récompense : personnage légendaire robot offert.',metric:'timeTrialGold',goal:10,coins:1200,xp:2200}
 );
+achievements.push({id:'weekly-gp-winner',name:'Roi du Grand Prix',description:'Remporter un Grand Prix hebdomadaire. Débloque l’achat du fauteuil Grand Prix X.',metric:'grandPrixWins',goal:1,coins:0,xp:2500});
 shopItems.push(
   {id:'chair-chronos',type:'chair',target:'chronos',name:'Chronos Kart',description:'Kart spécial de contre-la-montre : 10 vitesse / 9 accélération / 5 maniabilité = 24 points. Récompense gratuite.',price:0,level:1,achievement:'tt-gold',freeOnAchievement:true},
-  {id:'pilot-robot',type:'pilot',target:'robot',name:'R-0BOT',description:'Personnage légendaire robot, récompense gratuite du maître du temps.',price:0,level:1,rarity:'legendary',achievement:'tt-master',freeOnAchievement:true}
+  {id:'pilot-robot',type:'pilot',target:'robot',name:'R-0BOT',description:'Personnage légendaire robot, récompense gratuite du maître du temps.',price:0,level:1,rarity:'legendary',achievement:'tt-master',freeOnAchievement:true},
+  {id:'chair-grandprix',type:'chair',target:'grandprix',name:'Grand Prix X',description:'Fauteuil du champion hebdomadaire : 10 vitesse / 4 accélération / 10 maniabilité = 24 points.',price:12000,level:15,achievement:'weekly-gp-winner'}
 );
 
 export function achievementProgress(achievement,metrics) {

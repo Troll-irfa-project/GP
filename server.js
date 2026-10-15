@@ -53,6 +53,7 @@ function requireSession(req) {
 }
 async function api(req,res,path) {
   if(req.method==='GET' && path==='/api/leaderboards') return json(res,200,{circuits:tracks.map(t=>accounts.leaderboard(t.id)),withItems:tracks.map(t=>accounts.leaderboard(t.id,true)),endurance:tracks.map(t=>accounts.leaderboard(t.id,false,'endurance')),enduranceWithItems:tracks.map(t=>accounts.leaderboard(t.id,true,'endurance'))});
+  if(req.method==='GET' && path==='/api/grand-prix') {const session=requireSession(req),state=accounts.grandPrixState(),name=id=>accounts.db.prepare('SELECT username FROM users WHERE id=?').get(id)?.username||'Pilote';return json(res,200,{...state,canAttempt:state.canAttempt(session.user.id),track:tracks.find(t=>t.id===state.trackId)?.name||state.trackId,leaderboard:state.leaderboard.map(row=>({...row,username:name(row.userId)})),winner:state.winner?{...state.winner,username:name(state.winner.userId)}:null});}
   if(req.method==='GET' && path==='/api/me') return json(res,200,{user:accounts.session(readSessionCookie(req))?.user || null});
   if(req.method==='GET' && path==='/api/rooms') {requireSession(req);return json(res,200,{rooms:rooms.list()});}
   if(req.method!=='POST') throw new HttpError(405,'Méthode non autorisée.');

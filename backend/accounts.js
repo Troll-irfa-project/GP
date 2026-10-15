@@ -1,6 +1,7 @@
 import { Economy } from './economy.js';
 import { raceReward, cupReward } from '../public/progression.js';
 import { careerProgress } from '../public/competition.js';
+import { isoWeekStart, grandPrixDay, grandPrixTrackId } from '../public/grand-prix.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -64,6 +65,7 @@ export class Accounts {
     if(!this.db.prepare('PRAGMA table_info(race_results)').all().some(c=>c.name==='time_trial_medal'))this.db.exec("ALTER TABLE race_results ADD COLUMN time_trial_medal TEXT NOT NULL DEFAULT ''");
     this.db.exec('CREATE TABLE IF NOT EXISTS endurance_records(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,track_id TEXT NOT NULL,items_enabled INTEGER NOT NULL,best_race_ms INTEGER NOT NULL,best_lap_ms INTEGER,PRIMARY KEY(user_id,track_id,items_enabled)); CREATE INDEX IF NOT EXISTS endurance_rank ON endurance_records(track_id,items_enabled,best_race_ms);');
     if(!this.db.prepare('PRAGMA table_info(tournament_results)').all().some(c=>c.name==='cup_id'))this.db.exec("ALTER TABLE tournament_results ADD COLUMN cup_id TEXT NOT NULL DEFAULT 'classic'");
+    this.db.exec("CREATE TABLE IF NOT EXISTS weekly_gp_attempts(week_key TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,day INTEGER NOT NULL,time_ms INTEGER NOT NULL,track_id TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(week_key,user_id,day)); CREATE INDEX IF NOT EXISTS weekly_gp_rank ON weekly_gp_attempts(week_key,time_ms); CREATE TABLE IF NOT EXISTS weekly_gp_winners(week_key TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),track_id TEXT NOT NULL,time_ms INTEGER NOT NULL,created_at INTEGER NOT NULL);");
     this.economy = new Economy(this.db);
     this.economy.migrateBalance();
     this.economy.migrateLegends();
@@ -141,16 +143,51 @@ export class Accounts {
       if (inserted.changes) {
         this.db.prepare('UPDATE users SET races_finished=races_finished+1,races_won=races_won+? WHERE id=?').run(place === 1 ? 1 : 0, userId);
         if(mode==='endurance')this.db.prepare(`INSERT INTO endurance_records VALUES(?,?,?,?,?) ON CONFLICT(user_id,track_id,items_enabled) DO UPDATE SET best_race_ms=MIN(best_race_ms,excluded.best_race_ms),best_lap_ms=CASE WHEN best_lap_ms IS NULL THEN excluded.best_lap_ms WHEN excluded.best_lap_ms IS NULL THEN best_lap_ms ELSE MIN(best_lap_ms,excluded.best_lap_ms) END`).run(userId,trackId,itemsEnabled?1:0,timeMs,lapMs);
-        else this.db.prepare(`INSERT INTO ${itemsEnabled?'records_with_items':'records'} VALUES(?,?,?,?) ON CONFLICT(user_id,track_id) DO UPDATE SET
+        else if(mode!=='weekly-gp')this.db.prepare(`INSERT INTO ${itemsEnabled?'records_with_items':'records'} VALUES(?,?,?,?) ON CONFLICT(user_id,track_id) DO UPDATE SET
           best_race_ms=MIN(best_race_ms,excluded.best_race_ms),
           best_lap_ms=CASE WHEN best_lap_ms IS NULL THEN excluded.best_lap_ms WHEN excluded.best_lap_ms IS NULL THEN best_lap_ms ELSE MIN(best_lap_ms,excluded.best_lap_ms) END`).run(userId, trackId, timeMs, lapMs);
       }
       if (inserted.changes) {
         this.economy.grant(userId,'race:'+raceId,'Course terminée · #'+place,raceReward(place,difficulty,mode,itemStats.aahBonus||0));
+        if(mode==='weekly-gp')this.recordGrandPrixAttempt(userId,trackId,timeMs);
         this.economy.checkAchievements(userId);
       }
       this.db.exec('COMMIT');
     } catch (error) { this.db.exec('ROLLBACK'); throw error; }
+  }
+  previousWeek(weekKey) { const date=new Date(`${weekKey}T00:00:00Z`);date.setUTCDate(date.getUTCDate()-7);return date.toISOString().slice(0,10); }
+  settleGrandPrix(weekKey) {
+    if(this.db.prepare('SELECT 1 FROM weekly_gp_winners WHERE week_key=?').get(weekKey))return;
+    const winner=this.db.prepare('SELECT user_id AS userId,track_id AS trackId,time_ms AS timeMs FROM weekly_gp_attempts WHERE week_key=? AND time_ms<2147483647 ORDER BY time_ms,user_id LIMIT 1').get(weekKey);
+    if(!winner)return;
+    this.db.prepare('INSERT OR IGNORE INTO weekly_gp_winners VALUES(?,?,?,?,?)').run(weekKey,winner.userId,winner.trackId,winner.timeMs,Date.now());
+    this.economy.grant(winner.userId,'grand-prix:'+weekKey,'Victoire Grand Prix hebdomadaire',{coins:5000,xp:0});
+    this.economy.checkAchievements(winner.userId);
+  }
+  grandPrixState(now=Date.now()) {
+    const date=new Date(now),weekKey=isoWeekStart(date),day=grandPrixDay(date);
+    this.settleGrandPrix(day===0?weekKey:this.previousWeek(weekKey));
+    const attempts=this.db.prepare('SELECT user_id AS userId,day,time_ms AS timeMs,track_id AS trackId FROM weekly_gp_attempts WHERE week_key=? ORDER BY time_ms,user_id').all(weekKey);
+    const best=new Map();for(const attempt of attempts)if(attempt.timeMs<2147483647){const current=best.get(attempt.userId);if(!current||attempt.timeMs<current.timeMs)best.set(attempt.userId,attempt);}
+    const byDay=value=>attempts.filter(a=>a.day===value&&a.timeMs<2147483647).sort((a,b)=>a.timeMs-b.timeMs||a.userId.localeCompare(b.userId));
+    const eligible=day===1?null:byDay(day-1).slice(0,day===2?4:2).map(a=>a.userId);
+    const leaderboard=[...best.values()].sort((a,b)=>a.timeMs-b.timeMs||a.userId.localeCompare(b.userId)).map((a,index)=>({...a,rank:index+1}));
+    const finalWinner=this.db.prepare('SELECT user_id AS userId,track_id AS trackId,time_ms AS timeMs FROM weekly_gp_winners WHERE week_key=?').get(weekKey);
+    const winner=day>=3?leaderboard[0]||null:day===0&&finalWinner?{...finalWinner,rank:1}:null;
+    return {weekKey,day,trackId:grandPrixTrackId(weekKey),status:day?day===1?'open':day===2?'top-four':'top-two':'closed',attempts:attempts.map(a=>({...a,time:a.timeMs/1000})),leaderboard:leaderboard.map(a=>({...a,time:a.timeMs/1000})),eligible,winner:winner?{...winner,time:winner.timeMs/1000}:null,canAttempt:userId=>{if(!day||attempts.some(a=>a.userId===userId&&a.day===day))return false;if(day===1)return true;return eligible.includes(userId);}};
+  }
+  reserveGrandPrixAttempt(userId,trackId) {
+    const state=this.grandPrixState();
+    if(state.trackId!==trackId||!state.day||!state.canAttempt(userId))return false;
+    return Boolean(this.db.prepare('INSERT OR IGNORE INTO weekly_gp_attempts VALUES(?,?,?,?,?,?)').run(state.weekKey,userId,state.day,2147483647,trackId,Date.now()).changes);
+  }
+  recordGrandPrixAttempt(userId,trackId,timeMs) {
+    const state=this.grandPrixState();
+    if(state.trackId!==trackId||!state.day)return false;
+    const reserved=this.db.prepare('UPDATE weekly_gp_attempts SET time_ms=? WHERE week_key=? AND user_id=? AND day=? AND time_ms=2147483647').run(timeMs,state.weekKey,userId,state.day);
+    if(reserved.changes)return true;
+    if(!state.canAttempt(userId))return false;
+    return Boolean(this.db.prepare('INSERT OR IGNORE INTO weekly_gp_attempts VALUES(?,?,?,?,?,?)').run(state.weekKey,userId,state.day,timeMs,trackId,Date.now()).changes);
   }
   leaderboard(trackId,itemsEnabled=false,mode='race') {
     const table=mode==='endurance'?'endurance_records':itemsEnabled?'records_with_items':'records';

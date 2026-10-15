@@ -13,7 +13,8 @@ export const chairs=[
  {id:'relay',name:'Relay R',tag:'Atelier course',color:'#ffad49',speed:8,accel:9,handling:7},
  {id:'horizon',name:'Horizon GT',tag:'Grand tourisme',color:'#36d6d0',speed:9,accel:6,handling:9},
  {id:'apex',name:'Apex F1',tag:'Monoplace',color:'#f3394e',speed:10,accel:10,handling:4},
- {id:'chronos',name:'Chronos Kart',tag:'Contre-la-montre',color:'#ffe45c',speed:10,accel:9,handling:5}
+ {id:'chronos',name:'Chronos Kart',tag:'Contre-la-montre',color:'#ffe45c',speed:10,accel:9,handling:5},
+ {id:'grandprix',name:'Grand Prix X',tag:'Champion hebdomadaire',color:'#f05bff',speed:10,accel:4,handling:10}
 ];
 // Appearance only: pilot choice never changes vehicle handling or performance.
 export const pilots = [

@@ -27,7 +27,7 @@ const selection = createSelection(choices => {
   updateFavorite();
   if (currentRoom && state?.lobby.phase === 'waiting') {
     const data = { chairId:choices.chairId, pilotId:choices.pilotId };
-    if (state.lobby.hostId === playerId && ['race','endurance','time-trial'].includes(state.lobby.mode)) data.trackId = choices.trackId;
+    if (state.lobby.hostId === playerId && ['race','endurance','time-trial','weekly-gp'].includes(state.lobby.mode)) data.trackId = choices.trackId;
     send('configure',data);
   }
 },async data=>{const response=await api('/api/customization',data);portal.setUser(response.user);});
@@ -78,7 +78,7 @@ function connect() {
     state.lobby.track = state.tracks.find(track => track.id === state.lobby.trackId);
     snapshots.push(state, performance.now());
     if (reset) { cameraReady = false; finishPresentedAt = null; effects?.reset(); }
-    selection.setMultiplayer(state.lobby.trackId,state.lobby.hostId === playerId && (!state.lobby.mode || ['race','endurance','time-trial'].includes(state.lobby.mode)));
+    selection.setMultiplayer(state.lobby.trackId,state.lobby.hostId === playerId && (!state.lobby.mode || ['race','endurance','time-trial','weekly-gp'].includes(state.lobby.mode)));
     if (portal.page === 'garage') renderLobby();
     // Lobby DOM is event-driven; physics snapshots should not rebuild 12 cards at 15 Hz.
     const signature = JSON.stringify([state.lobby.itemsEnabled,state.lobby.mode,state.lobby.difficulty,state.lobby.cup,state.lobby.roomId,state.lobby.phase,state.lobby.hostId,state.lobby.trackId,state.racers.map(r=>[r.id,r.name,r.chairId,r.pilotId,r.isBot,r.finished,r.title,r.level])]);
@@ -194,7 +194,7 @@ function syncRacers(now, dt) {
   }
 }
 function syncTimeTrialGhost(){
-  const trial=state?.lobby?.mode==='time-trial'?state.lobby.timeTrial:null;
+  const trial=state?.lobby?.mode&&['time-trial','weekly-gp'].includes(state.lobby.mode)?state.lobby.timeTrial:null;
   if(!trial||!state?.lobby?.track){if(ghostObject)ghostObject.visible=false;return;}
   const me=state.racers.find(r=>r.id===playerId)||state.racers[0],key=`${me?.chairId}/${me?.pilotId}/${me?.customColor||''}/${me?.logoId||''}`;
   if(!ghostObject||ghostKey!==key){if(ghostObject)disposeObject(ghostObject);ghostKey=key;const chair=state.chairs.find(c=>c.id===me?.chairId)||state.chairs[0],pilot=state.pilots.find(p=>p.id===me?.pilotId)||pilots[0];ghostObject=makeChair(THREE,paintChair(chair,null,{color:me?.customColor,logoId:me?.logoId}),pilot,{race:true,rival:true});ghostObject.name='time-trial-ghost';ghostObject.userData.ghost=true;ghostObject.traverse(child=>{if(child.isMesh){child.castShadow=false;for(const material of [].concat(child.material)){material.transparent=true;material.opacity=.28;material.depthWrite=false;material.emissive?.set?.('#45e9ff');material.emissiveIntensity=.45;}}});scene.add(ghostObject);}
@@ -209,7 +209,7 @@ function resize() {
 async function showRace() {
   portal.show('race');
   $('#raceTrackName').textContent = `${state.lobby.track.name.toUpperCase()} · ${state.lobby.difficulty || '100'}cc${state.lobby.mode==='endurance'?' · ENDURANCE':''}${state.lobby.cup ? ` · MANCHE ${state.lobby.cup.round}/5` : ''}`;
-  $('#raceStatus').textContent = state.lobby.mode==='time-trial' ? `FANTÔME ${String(state.lobby.timeTrial?.target||'gold').toUpperCase()} · ${state.lobby.timeTrial?.reference?.toFixed(2)||'—'} S` : 'À TOI LA PISTE !';
+  $('#raceStatus').textContent = ['time-trial','weekly-gp'].includes(state.lobby.mode) ? `${state.lobby.mode==='weekly-gp'?'GRAND PRIX':'FANTÔME'} ${String(state.lobby.timeTrial?.target||'gold').toUpperCase()} · ${state.lobby.timeTrial?.reference?.toFixed(2)||'—'} S` : 'À TOI LA PISTE !';
   try { models = await loadModels(); }
   catch (error) { returnToGarage(); $('#menuStatus').textContent = 'Impossible de charger les modèles 3D. Réessaie après rechargement.'; console.error(error); return; }
   if (race.classList.contains('hidden')) return;
