@@ -5,6 +5,7 @@ import { createCourse, pointAt } from './racing.js';
 import { groundHeight } from './environment-math.js';
 import { instanceModel } from './model-assets.js';
 import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
+import { surfaceTexture } from './material-textures.js';
 
 export const raceThemes = {
   coast: { sky: '#0c8bd8', fog: '#ade4ec', ground: '#398e48', water: '#079cb8', stone: '#e6cda0', trees: '#50a569' },
@@ -212,7 +213,8 @@ export function decorateTrack(THREE, root, track, models = new Map()) {
   const used = new Set();
   for (const batch of batches.values()) {
     const isCloud = batch.shape === 'sphere' && ['#ffffff', '#a8abc6'].includes(batch.color);
-    const material = new THREE.MeshStandardMaterial({ color: batch.color, roughness: .8, emissive: batch.emissive || isCloud ? batch.color : '#000000', emissiveIntensity: batch.emissive ? .65 : isCloud ? .35 : 0 });
+    const textureType=batch.shape==='sphere'&&isCloud?'fabric':batch.shape==='rock'||batch.shape==='cliff'?'stone':batch.shape==='box'?'metal':'ground';
+    const material = new THREE.MeshStandardMaterial({ color: batch.color, map:surfaceTexture(THREE,textureType,batch.color,theme.stone), roughness: .8, emissive: batch.emissive || isCloud ? batch.color : '#000000', emissiveIntensity: batch.emissive ? .65 : isCloud ? .35 : 0 });
     const object = new THREE.InstancedMesh(shapes[batch.shape], material, batch.instances.length); object.name = 'scenery-batch'; object.castShadow = batch.shape !== 'sphere'; object.receiveShadow = true; used.add(batch.shape);
     batch.instances.forEach((item, i) => { transform.position.set(...item.position); transform.scale.set(...item.scale); transform.rotation.set(0, item.rotation, 0); transform.updateMatrix(); object.setMatrixAt(i, transform.matrix); });
     object.instanceMatrix.needsUpdate = true; object.computeBoundingSphere(); root.add(object);

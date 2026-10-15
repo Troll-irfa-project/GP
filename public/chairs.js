@@ -2,6 +2,7 @@ import { attachChairLogo } from './chair-logo.js';
 import { dressLegendary } from './legendary-models.js';
 import { RoundedBoxGeometry } from './vendor/RoundedBoxGeometry.js';
 import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
+import { surfaceTexture } from './material-textures.js';
 
 // Authored model parts all use -Z as their forward axis (feet, face and headlights).
 export const silhouettes = {
@@ -26,11 +27,11 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
   group.userData.pilotId = pilot.id;
   group.userData.logoId = chair.logoId || null;
   group.userData.customColor = chair.color;
-  const paint = new THREE.MeshPhysicalMaterial({ color: chair.color, metalness: .2, roughness: .32, clearcoat: .75, clearcoatRoughness: .24 });
-  const dark = new THREE.MeshStandardMaterial({ color: '#202935', roughness: .8 });
-  const metal = new THREE.MeshStandardMaterial({ color: '#adbbc4', metalness: .65, roughness: .35 });
+  const paint = new THREE.MeshPhysicalMaterial({ color: chair.color, map:surfaceTexture(THREE,'paint',chair.color,'#ffffff'), metalness: .2, roughness: .32, clearcoat: .75, clearcoatRoughness: .24 });
+  const dark = new THREE.MeshStandardMaterial({ color: '#202935', map:surfaceTexture(THREE,'rubber','#202935','#6b7884'), roughness: .8 });
+  const metal = new THREE.MeshStandardMaterial({ color: '#adbbc4', map:surfaceTexture(THREE,'metal','#adbbc4','#ffffff'), metalness: .65, roughness: .35 });
   const skin = new THREE.MeshStandardMaterial({ color: pilot.skin, roughness: .76 });
-  const clothes = new THREE.MeshStandardMaterial({ color: pilot.color, roughness: .65 });
+  const clothes = new THREE.MeshStandardMaterial({ color: pilot.color, map:surfaceTexture(THREE,'fabric',pilot.color,'#ffffff'), roughness: .65 });
   const hair = new THREE.MeshStandardMaterial({ color: pilot.hair, roughness: .88 });
   const white = new THREE.MeshStandardMaterial({ color: '#fff9e9', roughness: .65 });
   const lamp = new THREE.MeshStandardMaterial({ color: '#effbff', emissive: '#acdeff', emissiveIntensity: .5 });

@@ -1,11 +1,12 @@
 import * as THREE from 'three';
+import { surfaceTexture } from './material-textures.js';
 
 // Fixed pools, shared geometry/materials: no asset creation in the render loop.
 export function createItemVisuals(scene) {
   const root=new THREE.Group();root.name='race-items';scene.add(root);
   const dummy=new THREE.Object3D(),up=new THREE.Vector3(0,1,0),direction=new THREE.Vector3();
   const geometry=new THREE.BoxGeometry(1,1,1);
-  const cubeMat=new THREE.MeshStandardMaterial({color:'#49cffa',metalness:.45,roughness:.2,emissive:'#0b6385',emissiveIntensity:.8});
+  const cubeMat=new THREE.MeshStandardMaterial({color:'#49cffa',map:surfaceTexture(THREE,'paint','#49cffa','#d9fbff'),metalness:.45,roughness:.2,emissive:'#0b6385',emissiveIntensity:.8});
   const cubes=new THREE.InstancedMesh(geometry,cubeMat,12);cubes.name='mystery-boxes';
   const canvas=document.createElement('canvas');canvas.width=canvas.height=128;
   const ctx=canvas.getContext('2d');ctx.fillStyle='#102b55';ctx.fillRect(0,0,128,128);
@@ -17,7 +18,7 @@ export function createItemVisuals(scene) {
   const ringMat=new THREE.MeshBasicMaterial({color:'#59e7ff',transparent:true,opacity:.65,depthWrite:false});
   const shards=new THREE.InstancedMesh(geometry,faceMat,72);shards.name='mystery-opening-shards';
   const rings=new THREE.InstancedMesh(new THREE.TorusGeometry(1.2,.045,4,20),ringMat,12);rings.name='mystery-halos';
-  const ladderMat=new THREE.MeshStandardMaterial({color:'#ffbf48',metalness:.65,roughness:.35});
+  const ladderMat=new THREE.MeshStandardMaterial({color:'#ffbf48',map:surfaceTexture(THREE,'metal','#ffbf48','#fff0a0'),metalness:.65,roughness:.35});
   const ladders=new THREE.InstancedMesh(geometry,ladderMat,24*13);ladders.name='ladder-traps';
   const shotMat=new THREE.MeshBasicMaterial({color:'#fff19a',transparent:true,opacity:.85});
   const shots=new THREE.InstancedMesh(new THREE.CylinderGeometry(.045,.045,1,5),shotMat,24);shots.name='item-shot-trails';

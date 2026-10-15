@@ -4,6 +4,7 @@ import { decorateTrack, raceThemes } from './scenery.js';
 import { groundHeight, islandEdge } from './environment-math.js';
 import { createCourse, pointAt } from './racing.js';
 import { dressCircuit } from './track-dressing.js';
+import { surfaceTexture } from './material-textures.js';
 
 export function canvasTexture(size, draw) {
   const canvas = document.createElement('canvas'); canvas.width = canvas.height = size;
@@ -16,7 +17,9 @@ function roadTexture() {
   return canvasTexture(256, (ctx, size) => {
     ctx.fillStyle = '#484f60'; ctx.fillRect(0, 0, size, size);
     let seed = 74; const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
-    for (let i = 0; i < 12000; i++) { const value = 57 + Math.floor(random() * 30); ctx.fillStyle = `rgba(${value},${value + 5},${value + 12},.3)`; ctx.fillRect(random() * size, random() * size, 1, 1); }
+    for (let i = 0; i < 15000; i++) { const value = 45 + Math.floor(random() * 45); ctx.fillStyle = `rgba(${value},${value + 5},${value + 12},.34)`; ctx.fillRect(random() * size, random() * size, 1, 1); }
+    ctx.globalAlpha=.18;ctx.strokeStyle='#d8e0e7';ctx.lineWidth=1;for(let i=0;i<18;i++){const y=random()*size;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(size,y+random()*12-6);ctx.stroke();}
+    ctx.globalAlpha=.12;ctx.strokeStyle='#151c29';for(let i=0;i<10;i++){const x=random()*size;ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x+random()*20-10,size);ctx.stroke();}
   });
 }
 
@@ -55,7 +58,7 @@ function terrain(track, palette) {
     colors.push(color.r, color.g, color.b);
   }
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3)); geometry.computeVertexNormals();
-  const mesh = new THREE.Mesh(geometry, mat('#ffffff', { vertexColors: true })); mesh.name = 'sculpted-terrain'; mesh.receiveShadow = true; return mesh;
+  const mesh = new THREE.Mesh(geometry, mat('#ffffff', { vertexColors: true, map:surfaceTexture(THREE,'ground',palette.ground,palette.stone) })); mesh.name = 'sculpted-terrain'; mesh.receiveShadow = true; return mesh;
 }
 
 function sky(root, palette) {
@@ -69,8 +72,8 @@ export function createRaceWorld(track, models) {
   const root = new THREE.Group(); root.name = 'trackWorld'; root.userData.trackId = track.id;
   const palette = raceThemes[track.id], course = createCourse(track); sky(root, palette); root.add(terrain(track, palette));
   const texture = roadTexture(); texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  root.add(ribbon(track.route, track.width + 1.05, .23, mat('#f3e3bc')));
-  root.add(ribbon(track.route, track.width + .64, .32, mat('#ed5c61')));
+  root.add(ribbon(track.route, track.width + 1.05, .23, mat('#f3e3bc', {map:surfaceTexture(THREE,'curb','#f3e3bc','#fff9dc')})));
+  root.add(ribbon(track.route, track.width + .64, .32, mat('#ed5c61', {map:surfaceTexture(THREE,'curb','#ed5c61','#ffd0a0')})));
   root.add(ribbon(track.route, track.width, .40, mat('#ffffff', { map: texture, roughness: .94 })));
   const white = [], red = [], dashes = [];
   const steps = Math.ceil(course.total / 2.4), spacing = course.total / steps;
@@ -79,8 +82,8 @@ export function createRaceWorld(track, models) {
     for (const side of [-1, 1]) (j % 2 ? red : white).push({ position: [p.x - p.tz * (track.width + .32) * side, .43, p.z + p.tx * (track.width + .32) * side], scale: [.63, .13, spacing + .08], angle });
     if (j % 3 === 1) dashes.push({ position: [p.x, .417, p.z], scale: [.15, .012, 1.7], angle });
   }
-  instances(root, new THREE.BoxGeometry(1, 1, 1), mat('#fff3dc'), white, 'white-curbs');
-  instances(root, new THREE.BoxGeometry(1, 1, 1), mat('#ec4e56'), red, 'red-curbs');
+  instances(root, new THREE.BoxGeometry(1, 1, 1), mat('#fff3dc', {map:surfaceTexture(THREE,'curb','#fff3dc','#ffffff')}), white, 'white-curbs');
+  instances(root, new THREE.BoxGeometry(1, 1, 1), mat('#ec4e56', {map:surfaceTexture(THREE,'curb','#ec4e56','#ffb39f')}), red, 'red-curbs');
   instances(root, new THREE.BoxGeometry(1, 1, 1), mat('#f5eed9'), dashes, 'road-markings');
   const gate = course.finishGate, startYaw = Math.PI / 2 - Math.atan2(gate.tz, gate.tx);
   const checkered = canvasTexture(256, (ctx, s) => { for (let x = 0; x < 16; x++) for (let y = 0; y < 2; y++) { ctx.fillStyle = (x + y) % 2 ? '#1b2943' : '#fff5d5'; ctx.fillRect(x * s / 16, y * s / 2, s / 16, s / 2); } });
