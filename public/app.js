@@ -230,10 +230,12 @@ function draw3D(now) {
   syncRacers(now, dt);
   if(state.items?.enabled && !itemVisuals)itemVisuals=createItemVisuals(scene);
   itemVisuals?.update(state.items,now);
+  audio.observeItems(state.items);
   if(state.lobby.mode==='endurance'&&pitTrack!==state.lobby.trackId){if(pitVisuals)disposeObject(pitVisuals);pitVisuals=createPitVisuals(createCourse(state.lobby.track));pitTrack=state.lobby.trackId;scene.add(pitVisuals);}
   if(pitVisuals)pitVisuals.visible=state.lobby.mode==='endurance';
   animateWorld(environment, now, dt); effects.update(world, dt);
   const object = world.get(playerId);
+  audio.updateEngine(object?.userData.pose.speed || 0, Boolean(object && state.lobby.phase === 'racing'));
   if (object) {
     const heading = object.userData.pose.heading;
     const speed = Math.abs(object.userData.pose.speed || 0);
