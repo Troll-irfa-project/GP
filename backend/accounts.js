@@ -2,6 +2,7 @@ import { Economy } from './economy.js';
 import { raceReward, cupReward } from '../public/progression.js';
 import { careerProgress } from '../public/competition.js';
 import { isoWeekStart, grandPrixDay, grandPrixTrackId } from '../public/grand-prix.js';
+import { tracks } from '../public/catalog.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -65,7 +66,8 @@ export class Accounts {
     if(!this.db.prepare('PRAGMA table_info(race_results)').all().some(c=>c.name==='time_trial_medal'))this.db.exec("ALTER TABLE race_results ADD COLUMN time_trial_medal TEXT NOT NULL DEFAULT ''");
     this.db.exec('CREATE TABLE IF NOT EXISTS endurance_records(user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,track_id TEXT NOT NULL,items_enabled INTEGER NOT NULL,best_race_ms INTEGER NOT NULL,best_lap_ms INTEGER,PRIMARY KEY(user_id,track_id,items_enabled)); CREATE INDEX IF NOT EXISTS endurance_rank ON endurance_records(track_id,items_enabled,best_race_ms);');
     if(!this.db.prepare('PRAGMA table_info(tournament_results)').all().some(c=>c.name==='cup_id'))this.db.exec("ALTER TABLE tournament_results ADD COLUMN cup_id TEXT NOT NULL DEFAULT 'classic'");
-    this.db.exec("CREATE TABLE IF NOT EXISTS weekly_gp_attempts(week_key TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,day INTEGER NOT NULL,time_ms INTEGER NOT NULL,track_id TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(week_key,user_id,day)); CREATE INDEX IF NOT EXISTS weekly_gp_rank ON weekly_gp_attempts(week_key,time_ms); CREATE TABLE IF NOT EXISTS weekly_gp_winners(week_key TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),track_id TEXT NOT NULL,time_ms INTEGER NOT NULL,created_at INTEGER NOT NULL);");
+    this.db.exec("CREATE TABLE IF NOT EXISTS weekly_gp_attempts(week_key TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,day INTEGER NOT NULL,time_ms INTEGER NOT NULL,track_id TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(week_key,user_id,day)); CREATE INDEX IF NOT EXISTS weekly_gp_rank ON weekly_gp_attempts(week_key,time_ms); CREATE TABLE IF NOT EXISTS weekly_gp_winners(week_key TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),track_id TEXT NOT NULL,time_ms INTEGER NOT NULL,created_at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS weekly_gp_controls(id INTEGER PRIMARY KEY CHECK(id=1),week_key TEXT NOT NULL,day INTEGER NOT NULL,track_id TEXT NOT NULL); CREATE TABLE IF NOT EXISTS competition_controls(cup_id TEXT PRIMARY KEY,enabled INTEGER NOT NULL DEFAULT 1);");
+    this.db.prepare("INSERT OR IGNORE INTO competition_controls(cup_id,enabled) VALUES('classic',1),('horizons',1)").run();
     this.economy = new Economy(this.db);
     this.economy.migrateBalance();
     this.economy.migrateLegends();
@@ -165,7 +167,7 @@ export class Accounts {
     this.economy.checkAchievements(winner.userId);
   }
   grandPrixState(now=Date.now()) {
-    const date=new Date(now),weekKey=isoWeekStart(date),day=grandPrixDay(date);
+    const date=new Date(now),naturalWeek=isoWeekStart(date),control=this.db.prepare('SELECT week_key AS weekKey,day,track_id AS trackId FROM weekly_gp_controls WHERE id=1').get(),controlled=control?.weekKey===naturalWeek,weekKey=controlled?control.weekKey:naturalWeek,day=controlled?control.day:grandPrixDay(date);
     this.settleGrandPrix(day===0?weekKey:this.previousWeek(weekKey));
     const attempts=this.db.prepare('SELECT user_id AS userId,day,time_ms AS timeMs,track_id AS trackId FROM weekly_gp_attempts WHERE week_key=? ORDER BY time_ms,user_id').all(weekKey);
     const best=new Map();for(const attempt of attempts)if(attempt.timeMs<2147483647){const current=best.get(attempt.userId);if(!current||attempt.timeMs<current.timeMs)best.set(attempt.userId,attempt);}
@@ -174,7 +176,7 @@ export class Accounts {
     const leaderboard=[...best.values()].sort((a,b)=>a.timeMs-b.timeMs||a.userId.localeCompare(b.userId)).map((a,index)=>({...a,rank:index+1}));
     const finalWinner=this.db.prepare('SELECT user_id AS userId,track_id AS trackId,time_ms AS timeMs FROM weekly_gp_winners WHERE week_key=?').get(weekKey);
     const winner=day>=3?leaderboard[0]||null:day===0&&finalWinner?{...finalWinner,rank:1}:null;
-    return {weekKey,day,trackId:grandPrixTrackId(weekKey),status:day?day===1?'open':day===2?'top-four':'top-two':'closed',attempts:attempts.map(a=>({...a,time:a.timeMs/1000})),leaderboard:leaderboard.map(a=>({...a,time:a.timeMs/1000})),eligible,winner:winner?{...winner,time:winner.timeMs/1000}:null,canAttempt:userId=>{if(!day||attempts.some(a=>a.userId===userId&&a.day===day))return false;if(day===1)return true;return eligible.includes(userId);}};
+    return {weekKey,day,trackId:controlled?control.trackId:grandPrixTrackId(weekKey),status:day?day===1?'open':day===2?'top-four':'top-two':'closed',manual:controlled,attempts:attempts.map(a=>({...a,time:a.timeMs/1000})),leaderboard:leaderboard.map(a=>({...a,time:a.timeMs/1000})),eligible,winner:winner?{...winner,time:winner.timeMs/1000}:null,canAttempt:userId=>{if(!day||attempts.some(a=>a.userId===userId&&a.day===day))return false;if(day===1)return true;return eligible.includes(userId);}};
   }
   reserveGrandPrixAttempt(userId,trackId) {
     const state=this.grandPrixState();
@@ -189,6 +191,10 @@ export class Accounts {
     if(!state.canAttempt(userId))return false;
     return Boolean(this.db.prepare('INSERT OR IGNORE INTO weekly_gp_attempts VALUES(?,?,?,?,?,?)').run(state.weekKey,userId,state.day,timeMs,trackId,Date.now()).changes);
   }
+  competitionStatus() { return Object.fromEntries(this.db.prepare('SELECT cup_id AS id,enabled FROM competition_controls').all().map(row=>[row.id,Boolean(row.enabled)])); }
+  setCompetitionEnabled(cupId,enabled) { if(!['classic','horizons'].includes(cupId))throw new Error('Coupe inconnue.');this.db.prepare('UPDATE competition_controls SET enabled=? WHERE cup_id=?').run(enabled?1:0,cupId);return this.competitionStatus(); }
+  adminLaunchGrandPrix(trackId) { const track=tracks.find(t=>t.id===trackId);if(!track)throw new Error('Circuit inconnu.');const weekKey=isoWeekStart();this.db.exec('BEGIN IMMEDIATE');try{this.db.prepare('DELETE FROM weekly_gp_attempts WHERE week_key=?').run(weekKey);this.db.prepare('DELETE FROM weekly_gp_winners WHERE week_key=?').run(weekKey);this.db.prepare('INSERT INTO weekly_gp_controls(id,week_key,day,track_id) VALUES(1,?,1,?) ON CONFLICT(id) DO UPDATE SET week_key=excluded.week_key,day=1,track_id=excluded.track_id').run(weekKey,trackId);this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');throw error;}return this.grandPrixState(); }
+  adminAdvanceGrandPrix() { const state=this.grandPrixState(),control=this.db.prepare('SELECT * FROM weekly_gp_controls WHERE id=1 AND week_key=?').get(state.weekKey);if(!control)throw new Error('Aucun Grand Prix manuel actif cette semaine.');const next=control.day>=3?0:control.day+1;this.db.prepare('UPDATE weekly_gp_controls SET day=? WHERE id=1').run(next);if(next===0)this.settleGrandPrix(state.weekKey);return this.grandPrixState(); }
   leaderboard(trackId,itemsEnabled=false,mode='race') {
     const table=mode==='endurance'?'endurance_records':itemsEnabled?'records_with_items':'records';
     const read = column => this.db.prepare(`SELECT u.username,r.${column} AS timeMs,

@@ -7,12 +7,14 @@ import { Accounts, HttpError, readSessionCookie, sessionCookie, usernameKey } fr
 import { RoomManager } from './backend/rooms.js';
 import { chairs, tracks, pilots } from './public/catalog.js';
 import { MAX_RACERS } from './public/game-config.js';
+import { randomUUID } from 'node:crypto';
 
 const root = fileURLToPath(new URL('.', import.meta.url)), PORT = Number(process.env.PORT || 8080);
 const accounts = new Accounts(process.env.DB_PATH || join(root,'data','rollrush.sqlite'));
 const roomCount = Math.max(1,Math.min(20,Number.parseInt(process.env.ROOM_COUNT || '3',10) || 3));
 const rooms = new RoomManager(accounts,roomCount), connections = new Map(), usersOnline = new Map();
 const attempts = new Map();
+const adminSessions = new Map();
 const publicRoot = resolve(root,'public');
 const mime = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.svg':'image/svg+xml','.png':'image/png','.glb':'model/gltf-binary','.ttf':'font/ttf','.json':'application/json; charset=utf-8'};
 
@@ -51,7 +53,13 @@ function requireSession(req) {
   if(!session) throw new HttpError(401,'Connecte-toi pour continuer.');
   return session;
 }
+function requireAdmin(req) { const token=(req.headers.cookie||'').split(';').map(v=>v.trim()).find(v=>v.startsWith('rollrush_admin='))?.slice(14);if(!token||adminSessions.get(token)<=Date.now())throw new HttpError(401,'Authentification admin requise.');return token; }
+function adminCookie(token,maxAge=3600) { return `rollrush_admin=${token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${maxAge}`; }
 async function api(req,res,path) {
+  if(path==='/api/admin/login') { if(req.method!=='POST')throw new HttpError(405,'Méthode non autorisée.');if(!trustedOrigin(req))throw new HttpError(403,'Origine non autorisée.');const data=await body(req);if(data.username!=='admin'||data.password!=='admin')throw new HttpError(401,'Identifiants admin invalides.');const token=randomUUID();adminSessions.set(token,Date.now()+3600*1000);return json(res,200,{ok:true},{'Set-Cookie':adminCookie(token)}); }
+  if(path==='/api/admin/logout') { const token=requireAdmin(req);adminSessions.delete(token);return json(res,200,{ok:true},{'Set-Cookie':adminCookie('',0)}); }
+  if(path==='/api/admin/state') { requireAdmin(req);const gp=accounts.grandPrixState(),name=id=>accounts.db.prepare('SELECT username FROM users WHERE id=?').get(id)?.username||'Pilote';return json(res,200,{grandPrix:{...gp,canAttempt:undefined,leaderboard:gp.leaderboard.map(row=>({...row,username:name(row.userId)})),winner:gp.winner?{...gp.winner,username:name(gp.winner.userId)}:null},competitions:accounts.competitionStatus()}); }
+  if(path==='/api/admin/action') { requireAdmin(req);if(req.method!=='POST')throw new HttpError(405,'Méthode non autorisée.');if(!trustedOrigin(req))throw new HttpError(403,'Origine non autorisée.');const data=await body(req);let result;if(data.action==='launch-grand-prix')result=accounts.adminLaunchGrandPrix(data.trackId);else if(data.action==='advance-grand-prix')result=accounts.adminAdvanceGrandPrix();else if(data.action==='toggle-competition')result={competitions:accounts.setCompetitionEnabled(data.cupId,Boolean(data.enabled))};else throw new HttpError(400,'Action admin inconnue.');return json(res,200,{ok:true,result}); }
   if(req.method==='GET' && path==='/api/leaderboards') return json(res,200,{circuits:tracks.map(t=>accounts.leaderboard(t.id)),withItems:tracks.map(t=>accounts.leaderboard(t.id,true)),endurance:tracks.map(t=>accounts.leaderboard(t.id,false,'endurance')),enduranceWithItems:tracks.map(t=>accounts.leaderboard(t.id,true,'endurance'))});
   if(req.method==='GET' && path==='/api/grand-prix') {const session=requireSession(req),state=accounts.grandPrixState(),name=id=>accounts.db.prepare('SELECT username FROM users WHERE id=?').get(id)?.username||'Pilote';return json(res,200,{...state,canAttempt:state.canAttempt(session.user.id),track:tracks.find(t=>t.id===state.trackId)?.name||state.trackId,leaderboard:state.leaderboard.map(row=>({...row,username:name(row.userId)})),winner:state.winner?{...state.winner,username:name(state.winner.userId)}:null});}
   if(req.method==='GET' && path==='/api/me') return json(res,200,{user:accounts.session(readSessionCookie(req))?.user || null});

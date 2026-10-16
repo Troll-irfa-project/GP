@@ -105,6 +105,9 @@ export class RoomManager {
     if (data.trackId && data.trackId !== room.trackId && this.host(room) !== client) return this.error(client,'Seul l’hôte choisit le circuit.');
     if (data.chairId && !validChair(data.chairId) || data.pilotId && !validPilot(data.pilotId) || data.trackId && !tracks.some(t=>t.id===data.trackId)) return this.error(client,'Choix de course invalide.');
     if(data.cupId!==undefined&&!cups.some(c=>c.id===data.cupId))return this.error(client,'Coupe invalide.');
+    const competitionStatus=this.accounts.competitionStatus?.()||{};
+    if(data.cupId&& competitionStatus[data.cupId]===false)return this.error(client,'Cette coupe est temporairement désactivée.');
+    if(data.mode&&['tournament','career'].includes(data.mode)&&competitionStatus[data.cupId||room.cupId]===false)return this.error(client,'Cette coupe est temporairement désactivée.');
     const profile=this.accounts.profile(client.user.id);
     if (!ownsSelection(profile.progression,'chair',data.chairId || client.racer.chairId) || !ownsSelection(profile.progression,'pilot',data.pilotId || client.racer.pilotId)) return this.error(client,'Ce pilote ou fauteuil n’est pas encore dans ta collection.');
     if (data.itemsEnabled!==undefined) room.itemsEnabled=data.itemsEnabled;
@@ -147,6 +150,7 @@ export class RoomManager {
     const profile = this.accounts.profile(client.user.id);
     const cupId=data.cupId || 'classic';
     if(!cups.some(c=>c.id===cupId))return this.error(client,'Coupe invalide.');
+    if(this.accounts.competitionStatus?.()?.[cupId]===false)return this.error(client,'Cette coupe est temporairement désactivée.');
     if (!(profile.careers?.[cupId] || profile.career).unlocked.includes(data.difficulty)) return this.error(client,'Gagne le tournoi précédent pour débloquer cette catégorie.');
     const room = {id:`career-${client.user.id}`,name:'Coupe Carrière',private:true,owner:client.user.id,mode:'career',cupId,difficulty:data.difficulty,members:new Map(),racers:[],trackId:tracks[0].id};
     this.reset(room); this.rooms.set(room.id,room);
