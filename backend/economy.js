@@ -1,6 +1,7 @@
 import { chairs } from '../public/catalog.js';
 import { ownsLogo, validColor } from '../public/logo-catalog.js';
 import { shopItems, achievements, levelProgress, raceReward, cupReward, achievementProgress } from '../public/progression.js';
+import { seasonalEvents } from '../public/seasonal.js';
 
 export class Economy {
   constructor(db) {
@@ -101,7 +102,8 @@ export class Economy {
       ...Object.fromEntries(['bronze','silver','gold'].map(m=>['timeTrial'+m[0].toUpperCase()+m.slice(1),this.db.prepare("SELECT COUNT(*) AS n FROM race_results WHERE user_id=? AND race_mode='time-trial' AND time_trial_medal=?").get(id,m).n])),
       grandPrixWins:this.db.prepare('SELECT COUNT(*) AS n FROM weekly_gp_winners WHERE user_id=?').get(id).n,
       career150:this.db.prepare("SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND cup_id='classic' AND difficulty='150' AND place=1 AND points>0").get(id).n,
-      career:this.db.prepare("SELECT COUNT(DISTINCT difficulty) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND cup_id='classic' AND place=1 AND points>0").get(id).n};
+      career:this.db.prepare("SELECT COUNT(DISTINCT difficulty) AS n FROM tournament_results WHERE user_id=? AND mode='career' AND cup_id='classic' AND place=1 AND points>0").get(id).n,
+      ...Object.fromEntries(seasonalEvents.map(event=>[`eventWins-${event.id}`,this.db.prepare('SELECT COUNT(*) AS n FROM tournament_results WHERE user_id=? AND cup_id=? AND place=1 AND points>0').get(id,`season-${event.id}`).n]))};
   }
   checkAchievements(id) {
     const metrics=this.metrics(id);

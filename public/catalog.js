@@ -1,6 +1,7 @@
 import { legendaryPilots } from './legendary-catalog.js';
 import { horizonTracks } from './horizons.js';
 import { trackLayouts, longLayout } from './track-layouts.js';
+import { seasonalChairs, seasonalPilots, seasonalTracks } from './seasonal.js';
 export const chairs=[
  {id:'comet',name:'Comète',tag:'Vitesse',color:'#ff6b52',speed:10,accel:8,handling:6},
  {id:'atlas',name:'Atlas',tag:'Contrôle',color:'#f6c453',speed:6,accel:9,handling:9},
@@ -16,6 +17,7 @@ export const chairs=[
  {id:'chronos',name:'Chronos Kart',tag:'Contre-la-montre',color:'#ffe45c',speed:10,accel:9,handling:5},
  {id:'grandprix',name:'Grand Prix X',tag:'Champion hebdomadaire',color:'#f05bff',speed:10,accel:4,handling:10}
 ];
+chairs.push(...seasonalChairs);
 // Appearance only: pilot choice never changes vehicle handling or performance.
 export const pilots = [
  {id:'hawking',name:'Stephen Hawking',short:'Hawking',role:'L’esprit de la course',color:'#344767',skin:'#e8b48e',hair:'#96816a',style:'glasses',portrait:0},
@@ -33,11 +35,13 @@ pilots.push(
  {id:'idris',name:'Idris Sol',short:'Idris',role:'Le soleil au bout de la piste',color:'#efba49',skin:'#9c6849',hair:'#252630',style:'helmet',portrait:null}
 );
 pilots.push(...legendaryPilots);
+pilots.push(...seasonalPilots);
 export const tracks=[
  {id:'neon',name:'Boucle Néon',subtitle:'Boulevards rapides et double chicane',hue:168,width:6.2,route:trackLayouts.neon},
  {id:'coast',name:'Côte Azur',subtitle:'Corniche, baie et virages en S',hue:196,width:6.0,route:trackLayouts.coast},
  {id:'metro',name:'Métro Fantôme',subtitle:'Tunnel, épingle et grande ligne droite',hue:270,width:5.8,route:trackLayouts.metro},
  {id:'garden',name:'Jardin Turbo',subtitle:'Courbes fluides et enchaînements techniques',hue:108,width:6.6,route:trackLayouts.garden},
  {id:'orbit',name:'Orbital 9',subtitle:'Grandes courbes et retour en épingle',hue:310,width:5.7,route:trackLayouts.orbit},
- ...horizonTracks.map(({points,...t})=>({...t,cupId:'horizons',route:longLayout(points,t.length),menuArt:`/assets/${t.id}-menu.svg`}))
+ ...horizonTracks.map(({points,...t})=>({...t,cupId:'horizons',route:longLayout(points,t.length),menuArt:`/assets/${t.id}-menu.svg`})),
+ ...seasonalTracks
 ];

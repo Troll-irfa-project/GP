@@ -6,7 +6,8 @@ export const difficulties = [
 ];
 export const cups=[
   {id:'classic',name:'Coupe Originale',trackIds:['neon','coast','metro','garden','orbit']},
-  {id:'horizons',name:'Coupe Horizons',trackIds:['canyon','glacier','volcano','jungle','harbor']}
+  {id:'horizons',name:'Coupe Horizons',trackIds:['canyon','glacier','volcano','jungle','harbor']},
+  ...seasonalCups
 ];
 export const cupById=id=>cups.find(c=>c.id===id)||cups[0];
 export const positionPoints = [15,12,10,9,8,7,6,5,4,3,2,1];
@@ -19,3 +20,5 @@ export function careerProgress(wins) {
 export function standings(entries) {
   return [...entries].sort((a,b)=>b.points-a.points || b.wins-a.wins || a.time-b.time || a.seed-b.seed);
 }
+import { seasonalCups } from './seasonal.js';
+

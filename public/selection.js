@@ -4,6 +4,7 @@ import { silhouettes } from './chairs.js';
 import { createGarage } from './garage.js';
 import { ownsSelection, paintChair, itemFor, achievements, achievementProgress } from './progression.js';
 import { MAX_RACERS } from './game-config.js';
+import { seasonalEvents } from './seasonal.js';
 
 const $ = selector => document.querySelector(selector);
 const stats = [['Vitesse max.', 'speed'], ['Accélération', 'accel'], ['Maniabilité', 'handling']];
@@ -16,6 +17,7 @@ const themes = {
 };
 for(const track of tracks.filter(t=>t.cupId==='horizons'))themes[track.id]={label:'COUPE HORIZONS',description:track.subtitle,difficulty:4,tip:'Longue distance : prépare le freinage avant les épingles, puis accélère une fois le fauteuil aligné.'};
 const orderedTracks = ['coast', 'neon', 'garden', 'metro', 'orbit', 'canyon','glacier','volcano','jungle','harbor'].map(id => tracks.find(t => t.id === id));
+for(const event of seasonalEvents) for(const track of tracks.filter(t=>t.eventId===event.id)) themes[track.id]={label:`EVENT ${event.name.toUpperCase()}`,description:track.subtitle,difficulty:4,tip:`Circuit saisonnier de l’événement ${event.name}.`};
 const pad = n => String(n).padStart(2, '0');
 
 export function createSelection(onChange,onCustomize) {

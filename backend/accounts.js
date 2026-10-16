@@ -3,6 +3,7 @@ import { raceReward, cupReward } from '../public/progression.js';
 import { careerProgress } from '../public/competition.js';
 import { isoWeekStart, grandPrixDay, grandPrixTrackId } from '../public/grand-prix.js';
 import { tracks } from '../public/catalog.js';
+import { seasonalEvents } from '../public/seasonal.js';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -68,6 +69,8 @@ export class Accounts {
     if(!this.db.prepare('PRAGMA table_info(tournament_results)').all().some(c=>c.name==='cup_id'))this.db.exec("ALTER TABLE tournament_results ADD COLUMN cup_id TEXT NOT NULL DEFAULT 'classic'");
     this.db.exec("CREATE TABLE IF NOT EXISTS weekly_gp_attempts(week_key TEXT NOT NULL,user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,day INTEGER NOT NULL,time_ms INTEGER NOT NULL,track_id TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(week_key,user_id,day)); CREATE INDEX IF NOT EXISTS weekly_gp_rank ON weekly_gp_attempts(week_key,time_ms); CREATE TABLE IF NOT EXISTS weekly_gp_winners(week_key TEXT PRIMARY KEY,user_id TEXT NOT NULL REFERENCES users(id),track_id TEXT NOT NULL,time_ms INTEGER NOT NULL,created_at INTEGER NOT NULL); CREATE TABLE IF NOT EXISTS weekly_gp_controls(id INTEGER PRIMARY KEY CHECK(id=1),week_key TEXT NOT NULL,day INTEGER NOT NULL,track_id TEXT NOT NULL); CREATE TABLE IF NOT EXISTS competition_controls(cup_id TEXT PRIMARY KEY,enabled INTEGER NOT NULL DEFAULT 1);");
     this.db.prepare("INSERT OR IGNORE INTO competition_controls(cup_id,enabled) VALUES('classic',1),('horizons',1)").run();
+    const addSeasonal = this.db.prepare('INSERT OR IGNORE INTO competition_controls(cup_id,enabled) VALUES(?,1)');
+    for(const event of seasonalEvents)addSeasonal.run(`season-${event.id}`);
     this.economy = new Economy(this.db);
     this.economy.migrateBalance();
     this.economy.migrateLegends();
@@ -192,7 +195,7 @@ export class Accounts {
     return Boolean(this.db.prepare('INSERT OR IGNORE INTO weekly_gp_attempts VALUES(?,?,?,?,?,?)').run(state.weekKey,userId,state.day,timeMs,trackId,Date.now()).changes);
   }
   competitionStatus() { return Object.fromEntries(this.db.prepare('SELECT cup_id AS id,enabled FROM competition_controls').all().map(row=>[row.id,Boolean(row.enabled)])); }
-  setCompetitionEnabled(cupId,enabled) { if(!['classic','horizons'].includes(cupId))throw new Error('Coupe inconnue.');this.db.prepare('UPDATE competition_controls SET enabled=? WHERE cup_id=?').run(enabled?1:0,cupId);return this.competitionStatus(); }
+  setCompetitionEnabled(cupId,enabled) { if(!this.db.prepare('SELECT 1 FROM competition_controls WHERE cup_id=?').get(cupId))throw new Error('Coupe inconnue.');this.db.prepare('UPDATE competition_controls SET enabled=? WHERE cup_id=?').run(enabled?1:0,cupId);return this.competitionStatus(); }
   adminLaunchGrandPrix(trackId) { const track=tracks.find(t=>t.id===trackId);if(!track)throw new Error('Circuit inconnu.');const weekKey=isoWeekStart();this.db.exec('BEGIN IMMEDIATE');try{this.db.prepare('DELETE FROM weekly_gp_attempts WHERE week_key=?').run(weekKey);this.db.prepare('DELETE FROM weekly_gp_winners WHERE week_key=?').run(weekKey);this.db.prepare('INSERT INTO weekly_gp_controls(id,week_key,day,track_id) VALUES(1,?,1,?) ON CONFLICT(id) DO UPDATE SET week_key=excluded.week_key,day=1,track_id=excluded.track_id').run(weekKey,trackId);this.db.exec('COMMIT');}catch(error){this.db.exec('ROLLBACK');throw error;}return this.grandPrixState(); }
   adminAdvanceGrandPrix() { const state=this.grandPrixState(),control=this.db.prepare('SELECT * FROM weekly_gp_controls WHERE id=1 AND week_key=?').get(state.weekKey);if(!control)throw new Error('Aucun Grand Prix manuel actif cette semaine.');const next=control.day>=3?0:control.day+1;this.db.prepare('UPDATE weekly_gp_controls SET day=? WHERE id=1').run(next);if(next===0)this.settleGrandPrix(state.weekKey);return this.grandPrixState(); }
   leaderboard(trackId,itemsEnabled=false,mode='race') {
