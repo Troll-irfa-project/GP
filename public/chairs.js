@@ -17,6 +17,12 @@ export const silhouettes = {
   vector: { label: 'Double aileron · cockpit fuselé', width:1.12,length:1.65,back:.94,wheel:.43 },
   nomad: { label: 'Quatre grandes roues · pare-buffle', width:1.3,length:1.8,back:1.12,wheel:.46 },
   pulse: { label: 'Châssis compact · batteries latérales', width: .98, length: 1.35, back: 1.0, wheel: .38 },
+  autumn: {label:'Coque feuille · ailettes de saison',width:1.16,length:1.86,back:1.02,wheel:.43},
+  halloween: {label:'Coque cercueil · pointes fantômes',width:1.2,length:1.92,back:1.12,wheel:.44},
+  thanksgiving: {label:'Châssis récolte · paniers latéraux',width:1.34,length:1.78,back:1.08,wheel:.47},
+  winter: {label:'Châssis polaire · patins stabilisateurs',width:1.08,length:1.98,back:1.0,wheel:.41},
+  christmas: {label:'Traîneau caréné · clochettes arrière',width:1.2,length:2.02,back:1.06,wheel:.42},
+  newyear: {label:'Châssis Nova · fusées de célébration',width:1.1,length:1.9,back:.9,wheel:.4},
 };
 
 export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767', skin: '#e8b48e', hair: '#96816a', style: 'glasses' }, options = {}) {
@@ -35,7 +41,7 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
   const hair = new THREE.MeshStandardMaterial({ color: pilot.hair, roughness: .88 });
   const white = new THREE.MeshStandardMaterial({ color: '#fff9e9', roughness: .65 });
   const lamp = new THREE.MeshStandardMaterial({ color: '#effbff', emissive: '#acdeff', emissiveIntensity: .5 });
-  const trim = new THREE.MeshStandardMaterial({ color: '#ffdc56', metalness: .4, roughness: .3 });
+  const trim = new THREE.MeshStandardMaterial({ color: chair.accent || '#ffdc56', metalness: .4, roughness: .3 });
   const red = new THREE.MeshStandardMaterial({ color: '#ff5a63', emissive: '#fa233b', emissiveIntensity: .6 });
   function box(name, size, position, mat = paint) {
     const mesh = new THREE.Mesh(new RoundedBoxGeometry(...size, options.race ? 1 : 2, Math.min(...size) * .28), mat);
@@ -59,6 +65,12 @@ export function makeChair(THREE, chair, pilot = { id: 'hawking', color: '#344767
       const fin=box('horizon-gold-fin',[.07,.52,.56],[side*.55,1.12,.73],new THREE.MeshStandardMaterial({color:'#ffd56a',metalness:.55,roughness:.32}));fin.rotation.z=side*-.15;
     }
     box('horizon-tail',[1.4,.08,.3],[0,1.38,.92],metal);
+  }
+  if(chair.decal){
+    const seasonalPanel=new THREE.MeshStandardMaterial({color:chair.accent||'#ffdc56',emissive:chair.accent||'#ffdc56',emissiveIntensity:.18,metalness:.35,roughness:.3});
+    box(`${chair.decal}-nose`,[.48,.08,.28],[0,.64,-spec.length/2-.08],seasonalPanel);
+    box(`${chair.decal}-tail`,[.64,.08,.2],[0,1.28,spec.length/2-.08],seasonalPanel);
+    for(const side of [-1,1])box(`${chair.decal}-side`,[.045,.12,.58],[side*(spec.width/2+.04),.82,.1],seasonalPanel);
   }
   box('seat', [.86, .16, .78], [0, .84, 0], dark);
   box('backrest', [.86, spec.back, .16], [0, .84 + spec.back / 2, .43], dark);

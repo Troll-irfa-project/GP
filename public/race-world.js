@@ -70,7 +70,7 @@ function sky(root, palette) {
 
 export function createRaceWorld(track, models) {
   const root = new THREE.Group(); root.name = 'trackWorld'; root.userData.trackId = track.id;
-  const palette = raceThemes[track.id], course = createCourse(track); sky(root, palette); root.add(terrain(track, palette));
+  const palette = raceThemes[track.id] || raceThemes.coast, course = createCourse(track); sky(root, palette); root.add(terrain(track, palette));
   const texture = roadTexture(); texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
   root.add(ribbon(track.route, track.width + 1.05, .23, mat('#f3e3bc', {map:surfaceTexture(THREE,'curb','#f3e3bc','#fff9dc')})));
   root.add(ribbon(track.route, track.width + .64, .32, mat('#ed5c61', {map:surfaceTexture(THREE,'curb','#ed5c61','#ffd0a0')})));

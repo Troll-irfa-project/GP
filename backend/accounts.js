@@ -1,6 +1,6 @@
 import { Economy } from './economy.js';
 import { raceReward, cupReward } from '../public/progression.js';
-import { careerProgress } from '../public/competition.js';
+import { careerProgress, cups } from '../public/competition.js';
 import { isoWeekStart, grandPrixDay, grandPrixTrackId } from '../public/grand-prix.js';
 import { tracks } from '../public/catalog.js';
 import { seasonalEvents } from '../public/seasonal.js';
@@ -117,7 +117,7 @@ export class Accounts {
       progression: this.economy.profile(id),
       favoriteChairIds: JSON.parse(row.favorites), racesFinished: row.races_finished, racesWon: row.races_won,
       championships: [...JSON.parse(row.championships), ...this.db.prepare('SELECT tournament_id AS id,difficulty,mode,points FROM tournament_results WHERE user_id=? AND place=1 AND points>0').all(id)],
-      careers: Object.fromEntries(['classic','horizons'].map(cup=>[cup,careerProgress(this.db.prepare("SELECT DISTINCT difficulty FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND mode='career' AND cup_id=?").all(id,cup).map(r=>r.difficulty))])),
+      careers: Object.fromEntries(cups.map(cup=>[cup.id,careerProgress(this.db.prepare("SELECT DISTINCT difficulty FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND mode='career' AND cup_id=?").all(id,cup.id).map(r=>r.difficulty))])),
       career: careerProgress(this.db.prepare("SELECT DISTINCT difficulty FROM tournament_results WHERE user_id=? AND place=1 AND points>0 AND mode='career' AND cup_id='classic'").all(id).map(r=>r.difficulty)),
       records: this.db.prepare('SELECT track_id AS trackId,best_race_ms AS bestRaceMs,best_lap_ms AS bestLapMs,0 AS itemsEnabled,\'race\' AS mode FROM records WHERE user_id=? UNION ALL SELECT track_id,best_race_ms,best_lap_ms,1,\'race\' FROM records_with_items WHERE user_id=? UNION ALL SELECT track_id,best_race_ms,best_lap_ms,items_enabled,\'endurance\' FROM endurance_records WHERE user_id=? ORDER BY trackId').all(id,id,id) };
   }

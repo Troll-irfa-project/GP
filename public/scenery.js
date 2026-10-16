@@ -6,6 +6,7 @@ import { groundHeight } from './environment-math.js';
 import { instanceModel } from './model-assets.js';
 import { mergeGeometries } from './vendor/utils/BufferGeometryUtils.js';
 import { surfaceTexture } from './material-textures.js';
+import { seasonalEvents, seasonalTracks } from './seasonal.js';
 
 export const raceThemes = {
   coast: { sky: '#0c8bd8', fog: '#ade4ec', ground: '#398e48', water: '#079cb8', stone: '#e6cda0', trees: '#50a569' },
@@ -16,6 +17,16 @@ export const raceThemes = {
 };
 
 for(const track of horizonTracks)raceThemes[track.id]=track.palette;
+const seasonalPalettes = {
+  autumn:{sky:'#8c4f3b',fog:'#e9b17b',ground:'#82513b',water:'#426b68',stone:'#5b3a35',trees:'#a85b35'},
+  halloween:{sky:'#241743',fog:'#75639b',ground:'#332a48',water:'#332b61',stone:'#292437',trees:'#4b386d'},
+  thanksgiving:{sky:'#9d5e34',fog:'#e9b66e',ground:'#8c6037',water:'#51715c',stone:'#6c4631',trees:'#ad7137'},
+  winter:{sky:'#4f83b4',fog:'#c9e9f7',ground:'#a9c8d4',water:'#79b7ce',stone:'#daeaf0',trees:'#6e9eb6'},
+  christmas:{sky:'#4d203f',fog:'#c68f9e',ground:'#66805d',water:'#6a9aa1',stone:'#dfc5b1',trees:'#2f6d5b'},
+  newyear:{sky:'#141c51',fog:'#59669d',ground:'#273961',water:'#304c83',stone:'#39446f',trees:'#3f5b9b'}
+};
+for(const event of seasonalEvents) for(let index=1;index<=5;index++) raceThemes[`${event.id}-${index}`]={...seasonalPalettes[event.id]};
+for(const track of seasonalTracks) raceThemes[track.id]=track.visual;
 
 // All solid decorative footprints are checked against the same route as physics.
 export function sceneryPlacements(track) {
@@ -31,7 +42,7 @@ export function sceneryPlacements(track) {
 // Geometry is batched by material; GLB props preserve their original hierarchy.
 export function decorateTrack(THREE, root, track, models = new Map()) {
   if(track.cupId==='horizons')return decorateHorizons(THREE,root,track);
-  const theme = raceThemes[track.id], course = createCourse(track), batches = new Map(), transform = new THREE.Object3D();
+  const theme = raceThemes[track.id] || raceThemes.coast, course = createCourse(track), batches = new Map(), transform = new THREE.Object3D();
   root.userData.timeUniforms = []; root.userData.animated = [];
   const shapes = {
     box: new THREE.BoxGeometry(1, 1, 1), sphere: new THREE.SphereGeometry(1, 16, 12),
@@ -40,7 +51,7 @@ export function decorateTrack(THREE, root, track, models = new Map()) {
     cylinder: new THREE.CylinderGeometry(1, 1, 1, 24),
     dome: new THREE.SphereGeometry(1, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2),
   };
-  const isNight = track.id === 'neon' || track.id === 'metro';
+  const isNight = track.id === 'neon' || track.id === 'metro' || track.eventId === 'halloween' || track.eventId === 'newyear';
   function place(shape, color, position, scale, rotation = 0, emissive = false) {
     const key = `${shape}/${color}/${emissive}`;
     if (!batches.has(key)) batches.set(key, { shape, color, emissive, instances: [] });
@@ -138,6 +149,35 @@ export function decorateTrack(THREE, root, track, models = new Map()) {
     accents[id].push({ x, z, y: groundHeight(track, x, z), scale, angle: i * 1.3 });
   }
   for (const [id, items] of Object.entries(accents)) instanceModel(THREE, root, models.get(id), items, { wind: !id.startsWith('rock') });
+  if(track.seasonal){
+    const seed=track.routeSeed||1, accent=theme.accent||theme.trees;
+    const props={autumn:'leaf',halloween:'lantern',thanksgiving:'hay',winter:'ice',christmas:'gift',newyear:'firework'};
+    const prop=props[track.eventId]||'seasonal';
+    for(let i=0;i<7;i++){
+      const p=pointAt(course,course.total*(i+1)/8), side=i%2?1:-1, x=p.x-p.tz*side*14, z=p.z+p.tx*side*14, y=groundHeight(track,x,z);
+      if(prop==='leaf'){
+        place('sphere',accent,[x,y+.35,z],[1.8+(i%3)*.35,.25,1.2],i*.4);
+        place('roof',theme.trees,[x,y+1.2,z],[.7,.9,.7],0);
+      } else if(prop==='lantern'){
+        place('cylinder',theme.stone,[x,y+1.2,z],[.12,2.4,.12]);
+        place('sphere',accent,[x,y+2.6,z],[.45,.55,.45],0,true);
+      } else if(prop==='hay'){
+        place('box',accent,[x,y+1,z],[1.8,1.8,1.8],i*.3);
+        place('cylinder',theme.trees,[x,y+2.2,z],[.08,2.4,.08],i*.3);
+      } else if(prop==='ice'){
+        place('rock',accent,[x,y+2,z],[1.1,3.2,1.1],i*.2,true);
+        place('rock',theme.stone,[x+2,y+.5,z-1],[1.4,.8,1.1],i*.4);
+      } else if(prop==='gift'){
+        place('box',accent,[x,y+1,z],[1.5,2,1.5],i*.25);
+        place('box','#fff3c4',[x,y+1.02,z],[.18,2.05,1.56],i*.25);
+      } else {
+        place('cylinder',theme.stone,[x,y+1.8,z],[.08,3.6,.08]);
+        place('sphere',accent,[x,y+3.8,z],[.7,.7,.7],0,true);
+        place('sphere','#fff2a0',[x+2,y+2.4,z-1],[.18,.18,.18],0,true);
+      }
+    }
+    const banner=sign(track.name.toUpperCase(),track.route[0][0],groundHeight(track,track.route[0][0],track.route[0][1])+10,track.route[0][1],-Math.PI/2,15,1.5,accent); banner.name='seasonal-identity-banner';
+  }
   if (track.id === 'coast') {
     const shape = new THREE.Shape();
     shape.moveTo(-5, 0); shape.lineTo(-5, 13); shape.lineTo(5, 13); shape.lineTo(5, 0); shape.lineTo(3.3, 0); shape.lineTo(3.3, 5); shape.absarc(0, 5, 3.3, 0, Math.PI, false); shape.lineTo(-3.3, 0); shape.closePath();

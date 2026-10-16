@@ -16,7 +16,7 @@ const themes = {
   orbit: { label: 'GRAND PRIX CÉLESTE', description: 'La tête dans les nuages. Les yeux sur la piste.', difficulty: 4, tip: 'Un tour plus long et une piste étroite. La régularité vaut autant que la vitesse de pointe.' },
 };
 for(const track of tracks.filter(t=>t.cupId==='horizons'))themes[track.id]={label:'COUPE HORIZONS',description:track.subtitle,difficulty:4,tip:'Longue distance : prépare le freinage avant les épingles, puis accélère une fois le fauteuil aligné.'};
-const orderedTracks = ['coast', 'neon', 'garden', 'metro', 'orbit', 'canyon','glacier','volcano','jungle','harbor'].map(id => tracks.find(t => t.id === id));
+const orderedTracks = [...['coast', 'neon', 'garden', 'metro', 'orbit', 'canyon','glacier','volcano','jungle','harbor'].map(id => tracks.find(t => t.id === id)), ...tracks.filter(t=>t.eventId)];
 for(const event of seasonalEvents) for(const track of tracks.filter(t=>t.eventId===event.id)) themes[track.id]={label:`EVENT ${event.name.toUpperCase()}`,description:track.subtitle,difficulty:4,tip:`Circuit saisonnier de l’événement ${event.name}.`};
 const pad = n => String(n).padStart(2, '0');
 

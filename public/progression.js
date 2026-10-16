@@ -196,8 +196,15 @@ shopItems.push(
 );
 
 achievements.push(...logoAchievements,...bonusLogoAchievements,...seasonalLogoAchievements);
-const seasonalAchievementNames = ['Premiers frissons','Décor de saison','Virage thématique','Collectionneur','Pilote confirmé','Maître du tracé','Héros de l’événement','Champion saisonnier','Légende de la saison'];
-for(const event of seasonalEvents) for(let index=0;index<9;index++) achievements.push({id:`season-${event.id}-${index+1}`,name:`${event.name} · ${seasonalAchievementNames[index]}`,description:`Réussir l’objectif ${index+1}/10 de l’événement ${event.name}.`,metric:`eventWins-${event.id}`,goal:index+1,coins:150+(index*50),xp:300+(index*100)});
+const seasonalAchievementNames = {
+  autumn:['Pluie de feuilles','Sentier cuivré','Vendanges rapides','Virage crépusculaire','Gardien des brumes','Roi de la forêt','Course des récoltes','Légende dorée','Maître de l’automne'],
+  halloween:['Premier frisson','Nuit hantée','Chasseur de fantômes','Citrouille turbo','Cimetière express','Manoir dompté','Train fantôme','Terreur du chrono','Maître d’Halloween'],
+  thanksgiving:['Parade lancée','Récolte gagnante','Ferme en fête','Grande tablée','Dinde express','Canyon généreux','Chef du peloton','Champion de la récolte','Maître de Thanksgiving'],
+  winter:['Première trace','Virage givré','Lac maîtrisé','Col franchi','Forêt polaire','Station conquise','Aurore rapide','Roi des glaces','Maître de l’hiver'],
+  christmas:['Premier cadeau','Atelier ouvert','Lumières allumées','Traîneau lancé','Village sauvé','Usine maîtrisée','Père Noël express','Roi du réveillon','Maître de Noël'],
+  newyear:['Minuit passé','Feu d’artifice','Compte à rebours','Boulevard illuminé','Dernier tour','Première aube','Nova en tête','Nouvelle légende','Maître du Nouvel An']
+};
+for(const event of seasonalEvents) for(let index=0;index<9;index++) achievements.push({id:`season-${event.id}-${index+1}`,name:`${event.name} · ${seasonalAchievementNames[event.id][index]}`,description:`Gagner ${index+1} tournoi${index?'s':''} de l’événement ${event.name}.`,metric:`eventWins-${event.id}`,goal:index+1,coins:150+(index*50),xp:300+(index*100),eventId:event.id});
 achievements.push(
   {id:'tt-bronze',name:'Première médaille',description:'Gagner 3 médailles de bronze en contre-la-montre.',metric:'timeTrialBronze',goal:3,coins:180,xp:400},
   {id:'tt-silver',name:'Régulier au chrono',description:'Gagner 3 médailles d’argent en contre-la-montre.',metric:'timeTrialSilver',goal:3,coins:300,xp:650},

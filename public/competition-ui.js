@@ -19,7 +19,7 @@ export function createCompetitionUI(callbacks, api) {
     user=value;
     if(user)refreshGrandPrix();
     const career=user?.careers?.[$('careerCup').value] || user?.career;
-    $('careerProgressNotice').textContent=career?.completed.length===4 ? '★ CARRIÈRE TERMINÉE — Les quatre coupes sont à toi !' : `${career?.completed.length || 0} / 4 coupes remportées`;
+    $('careerProgressNotice').textContent=career?.completed.length===4 ? '★ CATÉGORIE TERMINÉE — Les quatre difficultés sont à toi !' : `${career?.completed.length || 0} / 4 difficultés remportées`;
     $('careerCards').innerHTML=difficulties.map(d=>{
       const won=career?.completed.includes(d.id), unlocked=career?.unlocked.includes(d.id) ?? d.id==='50';
       return `<article class="career-card ${won?'won':''} ${!unlocked?'locked':''}"><span class="section-kicker">${won?'★ COUPE REMPORTÉE':unlocked?'À CONQUÉRIR':'CATÉGORIE VERROUILLÉE'}</span><h3>${d.name}</h3><p>${d.label}</p><button class="${unlocked?'primary':'secondary'}" data-career="${d.id}" ${!unlocked||!online?'disabled':''}>${won?'REJOUER':unlocked?'RELEVER LE DÉFI':'GAGNE LA COUPE PRÉCÉDENTE'}</button></article>`;

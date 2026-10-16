@@ -117,7 +117,7 @@ function buildTrack(track = state.lobby.track) {
   if (builtTrack === track.id) return;
   if (environment) disposeObject(environment);
   builtTrack = track.id;
-  const palette = raceThemes[builtTrack]; scene.fog.color.set(palette.fog);
+  const palette = raceThemes[builtTrack] || raceThemes.coast; scene.fog.color.set(palette.fog);
   scene.fog.near=track.cupId==='horizons'?170:110;scene.fog.far=track.cupId==='horizons'?650:260;
   const night = ['neon', 'metro','volcano','harbor'].includes(builtTrack); sun.color.set(night ? '#c6d8ff' : '#fff0d7'); sun.intensity = night ? 1.8 : 2.6;
   environment = createRaceWorld(track, models); scene.add(environment);
